@@ -13,68 +13,93 @@ import { CommerceAdminPage } from './pages/CommerceAdminPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isGuest } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-[#666]">Cargando...</div>;
-  if (!user && !isGuest) return <Navigate to="/" replace />;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-[#666]">
+        Cargando...
+      </div>
+    );
+  }
+
+  if (!user && !isGuest) {
+    return <Navigate to="/auth" replace />;
+  }
+
   return <>{children}</>;
 }
 
 function AppShell() {
   const location = useLocation();
-  const showNav = ['/home', '/favorites', '/premium', '/profile'].some(p => location.pathname.startsWith(p));
+  const showNav = ['/home', '/favorites', '/premium', '/profile'].some(p =>
+    location.pathname.startsWith(p)
+  );
 
- return (
-  <div className="max-w-[430px] mx-auto min-h-screen bg-[#F5F5F5] relative">
-    <Routes>
+  return (
+    <div className="max-w-[430px] mx-auto min-h-screen bg-[#F5F5F5] relative">
+      <Routes>
 
-      <Route path="/" element={<SplashPage />} />
-      <Route path="/auth" element={<AuthPage />} />
+        <Route path="/" element={<SplashPage />} />
+        <Route path="/auth" element={<AuthPage />} />
 
-      <Route
-        path="/home"
-        element={
-          <ProtectedRoute>
-            <HomePage />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/gym/:id"
-        element={
-          <ProtectedRoute>
-            <GymProfilePage />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/gym/:id"
+          element={
+            <ProtectedRoute>
+              <GymProfilePage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/favorites"
-        element={
-          <ProtectedRoute>
-            <FavoritesPage />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/favorites"
+          element={
+            <ProtectedRoute>
+              <FavoritesPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/premium"
-        element={
-          <ProtectedRoute>
-            <PremiumPage />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/premium"
+          element={
+            <ProtectedRoute>
+              <PremiumPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
 
-    </Routes>
-  </div>
-);
-        
+      </Routes>
+
+      {showNav && <BottomNav />}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
