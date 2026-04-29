@@ -87,6 +87,8 @@ function AppShell() {
           }
         />
 
+        <Route path="*" element={<Navigate to="/home" replace />} />
+
       </Routes>
 
       {showNav && <BottomNav />}

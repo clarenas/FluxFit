@@ -39,8 +39,8 @@ export function AuthPage() {
     } catch (err: any) {
       setError(
         err.message === 'Invalid login credentials'
-          ? 'Credenciales invalidas'
-          : err.message || 'Error al iniciar sesion'
+          ? 'Credenciales inválidas'
+          : err.message || 'Error al iniciar sesión'
       );
     } finally {
       setSubmitting(false);
@@ -78,7 +78,7 @@ export function AuthPage() {
     <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12">
       <FluxFitLogo size="sm" />
       <h1 className="text-xl font-bold text-[#111111] mt-6 mb-6">
-        {isLogin ? 'Inicia sesion' : 'Crea tu cuenta'}
+        {isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}
       </h1>
       <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-4">
         {!isLogin && (
@@ -106,13 +106,13 @@ export function AuthPage() {
           />
         </div>
         <div>
-          <label className="text-sm text-[#666666] mb-1 block">Contrasena</label>
+          <label className="text-sm text-[#666666] mb-1 block">Contraseña</label>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             className="w-full px-4 py-3 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-[#111111] focus:outline-none focus:border-[#CC0000] transition-colors"
-            placeholder="Minimo 6 caracteres"
+            placeholder="Mínimo 6 caracteres"
             required
             minLength={6}
           />
@@ -123,15 +123,15 @@ export function AuthPage() {
           disabled={submitting}
           className="w-full py-3.5 bg-[#CC0000] text-white font-bold rounded-xl text-base active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          {submitting ? 'Cargando...' : isLogin ? 'Iniciar sesion' : 'Crear cuenta'}
+          {submitting ? 'Cargando...' : isLogin ? 'Iniciar sesión' : 'Crear cuenta'}
         </button>
       </form>
       <button
         onClick={() => navigate(isLogin ? '/auth?mode=register' : '/auth?mode=login')}
         className="mt-4 text-sm text-[#666666]"
       >
-        {isLogin ? 'No tienes cuenta? ' : 'Ya tienes cuenta? '}
-        <span className="text-[#CC0000] font-bold">{isLogin ? 'Registrate' : 'Inicia sesion'}</span>
+        {isLogin ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
+        <span className="text-[#CC0000] font-bold">{isLogin ? 'Regístrate' : 'Inicia sesión'}</span>
       </button>
     </div>
   );

@@ -56,6 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsGuest(false);
       }
       setLoading(false);
+      if (!session?.user) {
+        const savedGuest = sessionStorage.getItem('fluxfit_guest');
+        if (savedGuest === 'true') setIsGuest(true);
+      }
     };
 
     init();
@@ -101,11 +105,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setIsGuest(false);
+    sessionStorage.removeItem('fluxfit_guest');
   };
 
   const enterAsGuest = () => {
     setIsGuest(true);
     setLoading(false);
+    sessionStorage.setItem('fluxfit_guest', 'true');
   };
 
   return (

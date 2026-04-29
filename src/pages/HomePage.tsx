@@ -20,10 +20,11 @@ export function HomePage() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const [selectedCommerce, setSelectedCommerce] = useState<Commerce | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const isPremium = user?.is_premium ?? false;
 
-  const fetchGyms = useCallback(async () => { const { data } = await supabase.from('gyms').select('*').eq('is_active', true); if (data) setGyms(data); }, []);
-  const fetchCommerces = useCallback(async () => { const { data } = await supabase.from('commerces').select('*').eq('is_active', true); if (data) setCommerces(data); }, []);
+  const fetchGyms = useCallback(async () => { const { data, error } = await supabase.from('gyms').select('*').eq('is_active', true); if (error) { setFetchError('No se pudo cargar los gyms. Intenta de nuevo.'); } if (data) setGyms(data); }, []);
+  const fetchCommerces = useCallback(async () => { const { data, error } = await supabase.from('commerces').select('*').eq('is_active', true); if (error) { setFetchError('No se pudo cargar los descuentos.'); } if (data) setCommerces(data); }, []);
   const fetchFavorites = useCallback(async () => {
     if (!user || isGuest) return;
     const { data } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
@@ -80,7 +81,7 @@ export function HomePage() {
               <li className="flex items-center gap-2"><Check size={14} /> Descuentos en nutrición y suplementos</li>
               <li className="flex items-center gap-2"><Check size={14} /> Acceso a toda la red FluxFit</li>
             </ul>
-            <p className="text-2xl font-bold mt-3">{formatCLP(3990)} <span className="text-sm font-normal">/ mes</span></p>
+            <p className="text-2xl font-bold mt-3">{formatCLP(2990)} <span className="text-sm font-normal">/ mes</span></p>
             <button onClick={() => navigate('/premium')} className="mt-3 w-full py-3 bg-white text-[#CC0000] font-bold rounded-xl active:scale-[0.98] transition-transform">Quiero ser Premium</button>
           </div>
         )}
@@ -112,6 +113,7 @@ export function HomePage() {
               <button key={f.key} onClick={() => setFilter(f.key)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${filter === f.key ? 'bg-[#CC0000] text-white' : 'bg-white text-[#666666] border border-[#E5E5E5]'}`}>{f.label}</button>
             ))}
           </div>
+          {fetchError && <p className="text-[#CC0000] text-sm text-center py-4">{fetchError}</p>}
           <div className="grid grid-cols-2 gap-3 mt-3">
             {filteredGyms.map(gym => (
               <GymCard key={gym.id} gym={gym} isFavorite={favorites.includes(gym.id)} onToggleFavorite={toggleFavorite} onClick={id => navigate(`/gym/${id}`)} />

@@ -75,6 +75,7 @@ export function FavoritesPage() {
   const { user, isGuest } = useAuth();
   const [tab, setTab] = useState<Tab>('guardados');
   const [gyms, setGyms] = useState<Gym[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [allGyms, setAllGyms] = useState<Gym[]>([]);
   const [gymA, setGymA] = useState<Gym | null>(null);
   const [gymB, setGymB] = useState<Gym | null>(null);
@@ -83,7 +84,8 @@ export function FavoritesPage() {
 
   const fetchFavorites = useCallback(async () => {
     if (!user || isGuest) return;
-    const { data: favs } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
+    const { data: favs, error } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
+    if (error) { setFetchError('No se pudieron cargar tus gyms guardados.'); return; }
     if (favs && favs.length > 0) {
       const { data: gymData } = await supabase.from('gyms').select('*').in('id', favs.map(f => f.gym_id)).eq('is_active', true);
       if (gymData) setGyms(gymData);
@@ -150,6 +152,7 @@ export function FavoritesPage() {
       </div>
 
       <div className="px-4 pt-4">
+        {tab === 'guardados' && fetchError && <p className="text-[#CC0000] text-sm text-center py-4">{fetchError}</p>}
         {tab === 'guardados' && (
           gyms.length === 0 ? (
             <div className="text-center py-16">

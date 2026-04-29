@@ -23,6 +23,7 @@ export function GymProfilePage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<GymPlan | null>(null);
   const [selectedService, setSelectedService] = useState<GymService | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -34,6 +35,7 @@ export function GymProfilePage() {
       supabase.from('gym_recommended_hours').select('*').eq('gym_id', id).eq('is_active', true),
       supabase.from('weekly_occupancy_summary').select('*').eq('gym_id', id),
     ]);
+    if (gymRes.error || !gymRes.data) { setFetchError('No se pudo cargar la información de este gym.'); return; }
     if (gymRes.data) setGym(gymRes.data);
     if (plansRes.data) setPlans(plansRes.data);
     if (servicesRes.data) setServices(servicesRes.data);
@@ -63,7 +65,12 @@ export function GymProfilePage() {
     setIsFavorite(!isFavorite);
   };
 
-  if (!gym) return <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center text-[#666]">Cargando...</div>;
+  if (fetchError) return (
+    <div className="min-h-screen flex items-center justify-center text-[#CC0000] px-8 text-center text-sm">{fetchError}</div>
+  );
+  if (!gym) return (
+    <div className="min-h-screen flex items-center justify-center text-[#666]">Cargando...</div>
+  );
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-24">

@@ -36,10 +36,11 @@ export function PremiumPage() {
       </div>
       <div className="px-4 -mt-4 space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-xl border-2 border-[#E5E5E5] p-4 text-center"><p className="text-[#111111] font-bold text-lg">{formatCLP(3990)}</p><p className="text-[#666666] text-sm">/ mes</p></div>
+          <div className="bg-white rounded-xl border-2 border-[#E5E5E5] p-4 text-center"><p className="text-[#111111] font-bold text-lg">{formatCLP(2990)}</p><p className="text-[#666666] text-sm">/ mes</p></div>
           <div className="bg-[#CC0000] rounded-xl p-4 text-center relative">
             <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#111111] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">MEJOR VALOR</span>
-            <p className="text-white font-bold text-lg">{formatCLP(35900)}</p><p className="text-white/70 text-sm">/ año</p>
+            <p className="text-white font-bold text-lg">{formatCLP(29900)}</p><p className="text-white/70 text-sm">/ año</p>
+            <p className="text-white/70 text-xs mt-0.5">(2 meses gratis)</p>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
