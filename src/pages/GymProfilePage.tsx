@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, MapPin, Phone, Globe } from 'lucide-react';
+import { ArrowLeft, Heart, MapPin, Phone, Globe, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { OccupancyGauge } from '../components/OccupancyGauge';
 import { OccupancyHeatmap } from '../components/OccupancyHeatmap';
 import { BottomSheet } from '../components/BottomSheet';
+import { Toast } from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 import { formatCLP, getServiceCategoryLabel } from '../lib/utils';
-import type { Gym, GymPlan, GymService, GymDiscount, GymRecommendedHour, WeeklyOccupancySummary } from '../lib/types';
+import type { Gym, GymPlan, GymService, GymDiscount, GymRecommendedHour, WeeklyOccupancySummary, OccupancyLog } from '../lib/types';
 
 export function GymProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -24,16 +26,23 @@ export function GymProfilePage() {
   const [selectedPlan, setSelectedPlan] = useState<GymPlan | null>(null);
   const [selectedService, setSelectedService] = useState<GymService | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [todayLogs, setTodayLogs] = useState<OccupancyLog[]>([]);
+  const { toast, showToast } = useToast();
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
-    const [gymRes, plansRes, servicesRes, discountsRes, hoursRes, heatmapRes] = await Promise.all([
+    const [gymRes, plansRes, servicesRes, discountsRes, hoursRes, heatmapRes, logsRes] = await Promise.all([
       supabase.from('gyms').select('*').eq('id', id).maybeSingle(),
       supabase.from('gym_plans').select('*').eq('gym_id', id).eq('is_active', true),
       supabase.from('gym_services').select('*').eq('gym_id', id).eq('is_active', true),
       supabase.from('gym_discounts').select('*').eq('gym_id', id).eq('is_active', true),
       supabase.from('gym_recommended_hours').select('*').eq('gym_id', id).eq('is_active', true),
       supabase.from('weekly_occupancy_summary').select('*').eq('gym_id', id),
+      supabase.from('occupancy_logs')
+        .select('people_count, occupancy_percentage, occupancy_status, recorded_at')
+        .eq('gym_id', id)
+        .gte('recorded_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+        .order('recorded_at', { ascending: true }),
     ]);
     if (gymRes.error || !gymRes.data) { setFetchError('No se pudo cargar la información de este gym.'); return; }
     if (gymRes.data) setGym(gymRes.data);
@@ -42,6 +51,7 @@ export function GymProfilePage() {
     if (discountsRes.data) setDiscounts(discountsRes.data);
     if (hoursRes.data) setRecommendedHours(hoursRes.data);
     if (heatmapRes.data) setHeatmapData(heatmapRes.data);
+    if (logsRes.data) setTodayLogs(logsRes.data as OccupancyLog[]);
     if (user && !isGuest) {
       const { data: fav } = await supabase.from('user_favorite_gyms').select('id').eq('user_id', user.id).eq('gym_id', id).maybeSingle();
       setIsFavorite(!!fav);
@@ -65,6 +75,16 @@ export function GymProfilePage() {
     setIsFavorite(!isFavorite);
   };
 
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      await navigator.share({ title: gym?.name ?? '', text: `Mira este gym en FluxFit: ${gym?.name ?? ''}`, url });
+    } else {
+      await navigator.clipboard.writeText(url);
+      showToast('Link copiado al portapapeles', 'info');
+    }
+  };
+
   if (fetchError) return (
     <div className="min-h-screen flex items-center justify-center text-[#CC0000] px-8 text-center text-sm">{fetchError}</div>
   );
@@ -74,9 +94,13 @@ export function GymProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-24">
+      <Toast {...toast} />
       <div className="relative h-48 bg-gradient-to-br from-[#CC0000] to-[#111111]">
         <button onClick={() => navigate(-1)} className="absolute top-4 left-4 w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"><ArrowLeft size={20} className="text-white" /></button>
-        <button onClick={toggleFavorite} className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center"><Heart size={24} className={isFavorite ? 'text-[#CC0000] fill-[#CC0000]' : 'text-white'} /></button>
+        <div className="absolute top-4 right-4 flex gap-2">
+          <button onClick={handleShare} className="w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"><Share2 size={20} className="text-white" /></button>
+          <button onClick={toggleFavorite} className="w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"><Heart size={20} className={isFavorite ? 'text-[#CC0000] fill-[#CC0000]' : 'text-white'} /></button>
+        </div>
         <h1 className="absolute bottom-4 left-4 text-white font-bold text-xl drop-shadow-lg">{gym.name}</h1>
       </div>
 
@@ -88,9 +112,63 @@ export function GymProfilePage() {
           <div className="flex flex-wrap gap-2">{recommendedHours.map(h => <span key={h.id} className="bg-[#16A34A]/10 text-[#16A34A] text-xs font-medium px-2.5 py-1 rounded-full">{h.label}</span>)}</div>
         )}
 
+        {(() => {
+          const today = new Date().getDay();
+          const todayData = heatmapData.filter(h => h.day_of_week === today);
+          if (todayData.length === 0) return null;
+          const best = todayData.reduce((a, b) => a.avg_percentage < b.avg_percentage ? a : b);
+          const h = best.hour_of_day;
+          const fmt = (n: number) => String(n).padStart(2, '0') + ':00';
+          return (
+            <div className="bg-[#16A34A]/10 border border-[#16A34A]/30 rounded-xl p-4">
+              <p className="text-[#16A34A] font-bold text-sm">Mejor momento para venir hoy</p>
+              <p className="text-[#16A34A] text-2xl font-bold mt-1">{fmt(h)} – {fmt(h + 1)}</p>
+              <p className="text-[#16A34A]/70 text-xs mt-1">Históricamente el horario menos concurrido</p>
+            </div>
+          );
+        })()}
+
+        {todayLogs.length > 1 && (
+          <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+            <h3 className="font-bold text-[#111111] text-sm mb-3">Cómo estuvo hoy</h3>
+            <div className="flex items-end gap-1 h-16">
+              {(() => {
+                const logs = todayLogs.length > 12
+                  ? todayLogs.filter((_, i) => i % Math.ceil(todayLogs.length / 12) === 0).slice(0, 12)
+                  : todayLogs;
+                return logs.map((log, i) => {
+                  const color = log.occupancy_status === 'tranquilo' ? '#16A34A'
+                    : log.occupancy_status === 'moderado' ? '#EAB308' : '#CC0000';
+                  const pct = Math.max(log.occupancy_percentage, 5);
+                  const time = new Date(log.recorded_at).toLocaleTimeString('es-CL',
+                    { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full rounded-t-sm transition-all duration-300"
+                        style={{ height: `${pct}%`, backgroundColor: color, minHeight: 4 }} />
+                      <span className="text-[8px] text-[#999] rotate-45 origin-left">{time}</span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3">
           <h3 className="font-bold text-[#111111]">Información</h3>
           {gym.address && <p className="text-sm text-[#666666] flex items-center gap-2"><MapPin size={14} /> {gym.address}</p>}
+          {gym.address && (
+            <a
+              href={`https://maps.google.com/?q=${encodeURIComponent(gym.address + ', ' + gym.comuna + ', Chile')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-2 border border-[#CC0000]/30 text-[#CC0000] rounded-xl text-sm font-bold active:scale-[0.98] transition-transform"
+            >
+              <MapPin size={14} />
+              Cómo llegar
+            </a>
+          )}
           {gym.phone && <a href={`tel:${gym.phone}`} className="text-sm text-[#666666] flex items-center gap-2"><Phone size={14} /> {gym.phone}</a>}
           {gym.website && <a href={gym.website} target="_blank" rel="noopener noreferrer" className="text-sm text-[#CC0000] flex items-center gap-2"><Globe size={14} /> {gym.website}</a>}
           {gym.description && <p className="text-sm text-[#666666] mt-2">{gym.description}</p>}
