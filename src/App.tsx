@@ -37,7 +37,7 @@ function AppShell() {
   );
 
   return (
-    <div className="max-w-[430px] mx-auto min-h-screen bg-[#F5F5F5] relative">
+    <div className="max-w-[430px] md:max-w-[900px] mx-auto min-h-screen bg-[#F5F5F5] relative">
       <Routes>
 
         <Route path="/" element={<SplashPage />} />

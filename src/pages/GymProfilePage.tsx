@@ -105,8 +105,10 @@ export function GymProfilePage() {
       </div>
 
       <div className="px-4 pt-4 space-y-4">
-        <OccupancyGauge percentage={gym.occupancy_percentage} status={gym.occupancy_status} peopleCount={gym.current_count} sensorOnline={gym.sensor_online} lastSensorPing={gym.last_sensor_ping} />
-        <OccupancyHeatmap data={heatmapData} />
+        <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
+          <OccupancyGauge percentage={gym.occupancy_percentage} status={gym.occupancy_status} peopleCount={gym.current_count} sensorOnline={gym.sensor_online} lastSensorPing={gym.last_sensor_ping} />
+          <OccupancyHeatmap data={heatmapData} />
+        </div>
 
         {recommendedHours.length > 0 && (
           <div className="flex flex-wrap gap-2">{recommendedHours.map(h => <span key={h.id} className="bg-[#16A34A]/10 text-[#16A34A] text-xs font-medium px-2.5 py-1 rounded-full">{h.label}</span>)}</div>
@@ -177,7 +179,7 @@ export function GymProfilePage() {
         {plans.length > 0 && (
           <div>
             <h3 className="font-bold text-[#111111] mb-3">Planes disponibles</h3>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {plans.map(plan => (
                 <div key={plan.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4">
                   <h4 className="font-bold text-[#111111]">{plan.name}</h4>
@@ -199,7 +201,7 @@ export function GymProfilePage() {
         {services.length > 0 && (
           <div>
             <h3 className="font-bold text-[#111111] mb-3">Servicios</h3>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {services.map(svc => (
                 <div key={svc.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4">
                   <div className="flex items-center justify-between"><h4 className="font-bold text-[#111111]">{svc.name}</h4><span className="text-xs bg-[#F5F5F5] text-[#666666] px-2 py-0.5 rounded-full">{getServiceCategoryLabel(svc.category)}</span></div>

@@ -109,9 +109,9 @@ export function HomePage() {
 
         <div>
           <h2 className="text-[#111111] font-bold text-base mb-3">Descuentos FluxFit</h2>
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide md:grid md:grid-cols-4 md:overflow-x-visible md:mx-0 md:px-0">
             {commerces.map(c => (
-              <button key={c.id} onClick={() => setSelectedCommerce(c)} className="flex-shrink-0 w-36 bg-white rounded-xl shadow-sm border border-[#E5E5E5] p-3 text-left active:scale-[0.97] transition-transform">
+              <button key={c.id} onClick={() => setSelectedCommerce(c)} className="flex-shrink-0 md:flex-shrink w-36 md:w-full bg-white rounded-xl shadow-sm border border-[#E5E5E5] p-3 text-left active:scale-[0.97] transition-transform">
                 <div className="text-2xl mb-1">{getCommerceCategoryEmoji(c.category)}</div>
                 <h3 className="font-bold text-[#111111] text-sm leading-tight truncate">{c.name}</h3>
                 <div className="mt-2 relative inline-block">
@@ -141,7 +141,7 @@ export function HomePage() {
           </div>
           {fetchError && <p className="text-[#CC0000] text-sm text-center py-4">{fetchError}</p>}
           {loadingGyms ? <SkeletonList /> : (
-            <div className="grid grid-cols-2 gap-3 mt-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
               {filteredGyms.map(gym => (
                 <GymCard key={gym.id} gym={gym} isFavorite={favorites.includes(gym.id)} onToggleFavorite={toggleFavorite} onClick={id => navigate(`/gym/${id}`)} />
               ))}
