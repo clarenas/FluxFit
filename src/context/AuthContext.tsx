@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '../lib/types';
 import type { Session } from '@supabase/supabase-js';
@@ -32,39 +32,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
+  // Prevent getSession + onAuthStateChange race condition on initial load
+  const initializedRef = useRef(false);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+  const fetchProfile = async (userId: string): Promise<User | null> => {
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
     return data;
+  };
+
+  const ensureProfile = async (userId: string, email: string): Promise<User | null> => {
+    let profile = await fetchProfile(userId);
+    // Profile may not exist yet if user just confirmed email
+    if (!profile) {
+      await supabase.from('users').insert({ id: userId, email, full_name: '' });
+      profile = await fetchProfile(userId);
+    }
+    return profile;
   };
 
   const refreshProfile = async () => {
     if (session?.user) {
       const profile = await fetchProfile(session.user.id);
-      setUser(profile);
+      if (profile) setUser(profile);
     }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    // onAuthStateChange fires on mount with current session — use it as the
+    // single source of truth so we don't race with getSession().
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      if (s?.user) {
-        fetchProfile(s.user.id).then(profile => { setUser(profile); setLoading(false); });
-      } else { setLoading(false); }
-    });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
       if (s?.user) {
         (async () => {
+          if (!initializedRef.current) {
+            initializedRef.current = true;
+          }
           setLoading(true);
-          const profile = await fetchProfile(s.user.id);
+          const profile = await ensureProfile(s.user.id, s.user.email ?? '');
           setUser(profile);
           setIsGuest(false);
           setLoading(false);
         })();
       } else {
+        initializedRef.current = true;
         setUser(null);
+        setIsGuest(false);
         setLoading(false);
       }
     });
@@ -73,26 +90,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (authUser) { await supabase.from('users').insert({ id: authUser.id, email, full_name: fullName }); }
+    // If email confirmation is disabled, user is immediately available
+    if (data.user && data.session) {
+      const existing = await fetchProfile(data.user.id);
+      if (!existing) {
+        await supabase.from('users').insert({ id: data.user.id, email, full_name: fullName });
+      }
+    } else if (data.user && !data.session) {
+      // Email confirmation required — store fullName so we can use it when they confirm
+      // We insert a placeholder profile so ensureProfile can update it later
+      await supabase.from('users').upsert({ id: data.user.id, email, full_name: fullName });
+    }
   };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    // onAuthStateChange handles the rest
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null); setSession(null); setIsGuest(false);
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setIsGuest(false);
   };
 
   const enterAsGuest = () => {
     setUser(GUEST_USER);
     setIsGuest(true);
+    setLoading(false);
   };
 
   return (
