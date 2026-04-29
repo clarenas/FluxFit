@@ -3,11 +3,13 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { OccupancyGauge } from '../components/OccupancyGauge';
 import { OccupancyHeatmap } from '../components/OccupancyHeatmap';
+import { GymBranchesTab } from '../components/admin/GymBranchesTab';
+import { GymPromotionsTab } from '../components/admin/GymPromotionsTab';
 import { formatCLP, getServiceCategoryLabel, getFullDayLabel, timeAgo } from '../lib/utils';
-import type { Gym, GymPlan, GymService, GymDiscount, GymRecommendedHour, WeeklyOccupancySummary, OccupancyLog } from '../lib/types';
+import type { Gym, GymPlan, GymService, GymDiscount, GymRecommendedHour, WeeklyOccupancySummary, OccupancyLog, GymBranch, GymPromotion } from '../lib/types';
 import { Plus, Trash2, Copy, RefreshCw, AlertTriangle } from 'lucide-react';
 
-type AdminTab = 'planes' | 'servicios' | 'descuentos' | 'horarios' | 'sensor';
+type AdminTab = 'sucursales' | 'planes' | 'servicios' | 'promociones' | 'descuentos' | 'horarios' | 'sensor';
 
 export function GymAdminPage() {
   const { user } = useAuth();
@@ -16,10 +18,12 @@ export function GymAdminPage() {
   const [services, setServices] = useState<GymService[]>([]);
   const [discounts, setDiscounts] = useState<GymDiscount[]>([]);
   const [recommendedHours, setRecommendedHours] = useState<GymRecommendedHour[]>([]);
+  const [branches, setBranches] = useState<GymBranch[]>([]);
+  const [promotions, setPromotions] = useState<GymPromotion[]>([]);
   const [heatmapData, setHeatmapData] = useState<WeeklyOccupancySummary[]>([]);
   const [todayLogs, setTodayLogs] = useState<OccupancyLog[]>([]);
   const [sensorLogs, setSensorLogs] = useState<OccupancyLog[]>([]);
-  const [activeTab, setActiveTab] = useState<AdminTab>('planes');
+  const [activeTab, setActiveTab] = useState<AdminTab>('sucursales');
   const [showAddForm, setShowAddForm] = useState(false);
   const [maxCapacityEdit, setMaxCapacityEdit] = useState('');
   const [editingMaxCapacity, setEditingMaxCapacity] = useState(false);
@@ -34,7 +38,7 @@ export function GymAdminPage() {
     const { data: adminData } = await supabase.from('gym_admins').select('gym_id').eq('user_id', user.id).maybeSingle();
     if (!adminData) return;
     const gymId = adminData.gym_id;
-    const [gymRes, plansRes, servicesRes, discountsRes, hoursRes, heatmapRes, logsRes] = await Promise.all([
+    const [gymRes, plansRes, servicesRes, discountsRes, hoursRes, heatmapRes, logsRes, branchesRes, promoRes] = await Promise.all([
       supabase.from('gyms').select('*').eq('id', gymId).maybeSingle(),
       supabase.from('gym_plans').select('*').eq('gym_id', gymId),
       supabase.from('gym_services').select('*').eq('gym_id', gymId),
@@ -42,6 +46,8 @@ export function GymAdminPage() {
       supabase.from('gym_recommended_hours').select('*').eq('gym_id', gymId),
       supabase.from('weekly_occupancy_summary').select('*').eq('gym_id', gymId),
       supabase.from('occupancy_logs').select('*').eq('gym_id', gymId).gte('recorded_at', new Date(new Date().setHours(0,0,0,0)).toISOString()).order('recorded_at', { ascending: true }),
+      supabase.from('gym_branches').select('*').eq('gym_id', gymId).order('created_at'),
+      supabase.from('gym_promotions').select('*').eq('gym_id', gymId).order('created_at'),
     ]);
     if (gymRes.data) { setGym(gymRes.data); setMaxCapacityEdit(String(gymRes.data.max_capacity)); }
     if (plansRes.data) setPlans(plansRes.data);
@@ -50,6 +56,8 @@ export function GymAdminPage() {
     if (hoursRes.data) setRecommendedHours(hoursRes.data);
     if (heatmapRes.data) setHeatmapData(heatmapRes.data);
     if (logsRes.data) setTodayLogs(logsRes.data);
+    if (branchesRes.data) setBranches(branchesRes.data);
+    if (promoRes.data) setPromotions(promoRes.data);
   }, [user]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -118,7 +126,8 @@ export function GymAdminPage() {
   if (!gym) return <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center text-[#666]">Cargando panel de administración...</div>;
 
   const tabs: { key: AdminTab; label: string }[] = [
-    { key: 'planes', label: 'Planes' }, { key: 'servicios', label: 'Servicios' },
+    { key: 'sucursales', label: 'Sucursales' }, { key: 'planes', label: 'Planes' },
+    { key: 'servicios', label: 'Servicios' }, { key: 'promociones', label: 'Promociones' },
     { key: 'descuentos', label: 'Descuentos' }, { key: 'horarios', label: 'Horarios' },
     { key: 'sensor', label: 'Sensor' },
   ];
@@ -166,6 +175,9 @@ export function GymAdminPage() {
         </div>
 
         <div className="space-y-3">
+          {activeTab === 'sucursales' && <GymBranchesTab gymId={gym.id} branches={branches} onRefresh={fetchAll} />}
+          {activeTab === 'promociones' && <GymPromotionsTab gymId={gym.id} promotions={promotions} onRefresh={fetchAll} />}
+
           {activeTab === 'planes' && (<>
             {plans.map(p => <div key={p.id} className="bg-white rounded-xl border border-[#E5E5E5] p-3 flex items-center justify-between"><div><p className="font-bold text-sm text-[#111111]">{p.name}</p><p className="text-xs text-[#666666]">Regular: {formatCLP(p.regular_price)} / Premium: {formatCLP(p.premium_price)}</p></div><button onClick={() => deleteItem('gym_plans', p.id)} className="p-2"><Trash2 size={16} className="text-[#CC0000]" /></button></div>)}
             {showAddForm ? (
