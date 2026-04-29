@@ -4,6 +4,9 @@ import { Heart, Eye, GitCompare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { GymCard } from '../components/GymCard';
+import { Toast } from '../components/Toast';
+import { SkeletonList } from '../components/SkeletonList';
+import { useToast } from '../hooks/useToast';
 import { getOccupancyColor, getOccupancyLabel, formatCLP } from '../lib/utils';
 import type { Gym, GymPlan } from '../lib/types';
 
@@ -76,6 +79,8 @@ export function FavoritesPage() {
   const [tab, setTab] = useState<Tab>('guardados');
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [loadingGyms, setLoadingGyms] = useState(true);
+  const { toast, showToast } = useToast();
   const [allGyms, setAllGyms] = useState<Gym[]>([]);
   const [gymA, setGymA] = useState<Gym | null>(null);
   const [gymB, setGymB] = useState<Gym | null>(null);
@@ -84,11 +89,16 @@ export function FavoritesPage() {
 
   const fetchFavorites = useCallback(async () => {
     if (!user || isGuest) return;
-    const { data: favs, error } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
-    if (error) { setFetchError('No se pudieron cargar tus gyms guardados.'); return; }
-    if (favs && favs.length > 0) {
-      const { data: gymData } = await supabase.from('gyms').select('*').in('id', favs.map(f => f.gym_id)).eq('is_active', true);
-      if (gymData) setGyms(gymData);
+    setLoadingGyms(true);
+    try {
+      const { data: favs, error } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
+      if (error) { setFetchError('No se pudieron cargar tus gyms guardados.'); return; }
+      if (favs && favs.length > 0) {
+        const { data: gymData } = await supabase.from('gyms').select('*').in('id', favs.map(f => f.gym_id)).eq('is_active', true);
+        if (gymData) setGyms(gymData);
+      }
+    } finally {
+      setLoadingGyms(false);
     }
   }, [user, isGuest]);
 
@@ -122,6 +132,7 @@ export function FavoritesPage() {
     if (!user || isGuest) return;
     await supabase.from('user_favorite_gyms').delete().eq('user_id', user.id).eq('gym_id', gymId);
     setGyms(prev => prev.filter(g => g.id !== gymId));
+    showToast('Gym eliminado de favoritos', 'info');
   };
 
   if (isGuest) {
@@ -139,6 +150,7 @@ export function FavoritesPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-24">
+      <Toast {...toast} />
       <div className="bg-white border-b border-[#E5E5E5] px-4 py-3">
         <h1 className="text-[#111] font-bold text-lg">Mis Gyms</h1>
       </div>
@@ -154,7 +166,7 @@ export function FavoritesPage() {
       <div className="px-4 pt-4">
         {tab === 'guardados' && fetchError && <p className="text-[#CC0000] text-sm text-center py-4">{fetchError}</p>}
         {tab === 'guardados' && (
-          gyms.length === 0 ? (
+          loadingGyms ? <SkeletonList /> : gyms.length === 0 ? (
             <div className="text-center py-16">
               <Heart size={48} className="text-[#E5E5E5] mx-auto mb-3" />
               <p className="text-[#666]">Aún no tienes gyms guardados</p>

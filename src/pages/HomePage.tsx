@@ -6,6 +6,9 @@ import { useAuth } from '../context/AuthContext';
 import { GymCard } from '../components/GymCard';
 import { BottomSheet } from '../components/BottomSheet';
 import { FluxFitLogo } from '../components/FluxFitLogo';
+import { Toast } from '../components/Toast';
+import { SkeletonList } from '../components/SkeletonList';
+import { useToast } from '../hooks/useToast';
 import { formatCLP, getCommerceCategoryEmoji, getCommerceCategoryLabel } from '../lib/utils';
 import type { Gym, Commerce } from '../lib/types';
 
@@ -21,9 +24,20 @@ export function HomePage() {
   const [search, setSearch] = useState('');
   const [selectedCommerce, setSelectedCommerce] = useState<Commerce | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [loadingGyms, setLoadingGyms] = useState(true);
+  const { toast, showToast } = useToast();
   const isPremium = user?.is_premium ?? false;
 
-  const fetchGyms = useCallback(async () => { const { data, error } = await supabase.from('gyms').select('*').eq('is_active', true); if (error) { setFetchError('No se pudo cargar los gyms. Intenta de nuevo.'); } if (data) setGyms(data); }, []);
+  const fetchGyms = useCallback(async () => {
+    setLoadingGyms(true);
+    try {
+      const { data, error } = await supabase.from('gyms').select('*').eq('is_active', true);
+      if (error) { setFetchError('No se pudo cargar los gyms. Intenta de nuevo.'); }
+      if (data) setGyms(data);
+    } finally {
+      setLoadingGyms(false);
+    }
+  }, []);
   const fetchCommerces = useCallback(async () => { const { data, error } = await supabase.from('commerces').select('*').eq('is_active', true); if (error) { setFetchError('No se pudo cargar los descuentos.'); } if (data) setCommerces(data); }, []);
   const fetchFavorites = useCallback(async () => {
     if (!user || isGuest) return;
@@ -45,9 +59,11 @@ export function HomePage() {
     if (favorites.includes(gymId)) {
       await supabase.from('user_favorite_gyms').delete().eq('user_id', user.id).eq('gym_id', gymId);
       setFavorites(prev => prev.filter(id => id !== gymId));
+      showToast('Gym eliminado de favoritos', 'info');
     } else {
       await supabase.from('user_favorite_gyms').insert({ user_id: user.id, gym_id: gymId });
       setFavorites(prev => [...prev, gymId]);
+      showToast('Gym guardado en favoritos', 'success');
     }
   };
 
@@ -64,6 +80,7 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-20">
+      <Toast {...toast} />
       <div className="bg-white border-b border-[#E5E5E5] px-4 py-3 flex items-center gap-3 sticky top-0 z-40">
         <FluxFitLogo size="sm" />
         <span className="text-[#111111] font-semibold flex-1">Hola, {isGuest ? 'invitado' : (user?.full_name?.split(' ')[0] || 'usuario')}</span>
@@ -114,12 +131,14 @@ export function HomePage() {
             ))}
           </div>
           {fetchError && <p className="text-[#CC0000] text-sm text-center py-4">{fetchError}</p>}
-          <div className="grid grid-cols-2 gap-3 mt-3">
-            {filteredGyms.map(gym => (
-              <GymCard key={gym.id} gym={gym} isFavorite={favorites.includes(gym.id)} onToggleFavorite={toggleFavorite} onClick={id => navigate(`/gym/${id}`)} />
-            ))}
-          </div>
-          {filteredGyms.length === 0 && <p className="text-center text-[#666666] text-sm mt-8">No se encontraron gyms</p>}
+          {loadingGyms ? <SkeletonList /> : (
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              {filteredGyms.map(gym => (
+                <GymCard key={gym.id} gym={gym} isFavorite={favorites.includes(gym.id)} onToggleFavorite={toggleFavorite} onClick={id => navigate(`/gym/${id}`)} />
+              ))}
+            </div>
+          )}
+          {!loadingGyms && filteredGyms.length === 0 && <p className="text-center text-[#666666] text-sm mt-8">No se encontraron gyms</p>}
         </div>
       </div>
 
