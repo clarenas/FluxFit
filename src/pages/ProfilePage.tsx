@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Eye } from 'lucide-react';
+import { LogOut, Eye, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getInitials, getOccupancyColor, getOccupancyLabel } from '../lib/utils';
 import { useState, useEffect, useCallback } from 'react';
@@ -92,6 +92,13 @@ export function ProfilePage() {
           )}
         </div>
         <button onClick={handleSignOut} className="w-full py-3.5 border-2 border-[#111111] text-[#111111] font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"><LogOut size={18} />Cerrar sesión</button>
+        <button
+          onClick={() => navigate('/contact')}
+          className="w-full py-3.5 border border-[#E5E5E5] text-[#666666] rounded-xl flex items-center justify-center gap-2 text-sm active:scale-[0.98] transition-transform"
+        >
+          <Mail size={16} />
+          Contáctanos
+        </button>
       </div>
     </div>
   );

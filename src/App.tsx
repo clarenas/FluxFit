@@ -10,6 +10,7 @@ import { FavoritesPage } from './pages/FavoritesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { GymAdminPage } from './pages/GymAdminPage';
 import { CommerceAdminPage } from './pages/CommerceAdminPage';
+import { ContactPage } from './pages/ContactPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isGuest } = useAuth();
@@ -86,6 +87,8 @@ function AppShell() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/contact" element={<ContactPage />} />
 
         <Route path="*" element={<Navigate to="/home" replace />} />
 
