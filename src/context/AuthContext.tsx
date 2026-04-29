@@ -45,13 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const ensureProfile = async (userId: string, email: string): Promise<User | null> => {
-    let profile = await fetchProfile(userId);
-    // Profile may not exist yet if user just confirmed email
-    if (!profile) {
-      await supabase.from('users').insert({ id: userId, email, full_name: '' });
-      profile = await fetchProfile(userId);
-    }
-    return profile;
+    // upsert avoids duplicate key errors if profile already exists
+    await supabase
+      .from('users')
+      .upsert({ id: userId, email, full_name: '' }, { onConflict: 'id', ignoreDuplicates: true });
+    return fetchProfile(userId);
   };
 
   const refreshProfile = async () => {
