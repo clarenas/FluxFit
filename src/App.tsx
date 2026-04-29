@@ -22,31 +22,59 @@ function AppShell() {
   const location = useLocation();
   const showNav = ['/home', '/favorites', '/premium', '/profile'].some(p => location.pathname.startsWith(p));
 
-  return (
-    <div className="max-w-[430px] mx-auto min-h-screen bg-[#F5F5F5] relative">
-      <Routes>
-        <Route path="/" element={<SplashPage />} />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-        <Route path="/gym/:id" element={<ProtectedRoute><GymProfilePage /></ProtectedRoute>} />
-        <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
-        <Route path="/premium" element={<ProtectedRoute><PremiumPage /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/gym-admin" element={<ProtectedRoute><GymAdminPage /></ProtectedRoute>} />
-        <Route path="/commerce-admin" element={<ProtectedRoute><CommerceAdminPage /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      {showNav && <BottomNav />}
-    </div>
-  );
-}
+ return (
+  <div className="max-w-[430px] mx-auto min-h-screen bg-[#F5F5F5] relative">
+    <Routes>
 
-export default function App() {
-  return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppShell />
-      </AuthProvider>
-    </BrowserRouter>
-  );
-}
+      <Route path="/" element={<SplashPage />} />
+      <Route path="/auth" element={<AuthPage />} />
+
+      <Route
+        path="/home"
+        element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/gym/:id"
+        element={
+          <ProtectedRoute>
+            <GymProfilePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/favorites"
+        element={
+          <ProtectedRoute>
+            <FavoritesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/premium"
+        element={
+          <ProtectedRoute>
+            <PremiumPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+
+    </Routes>
+  </div>
+);
+        
