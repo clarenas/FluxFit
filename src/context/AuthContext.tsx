@@ -1,17 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '../lib/types';
 import type { Session } from '@supabase/supabase-js';
-
-const GUEST_USER: User = {
-  id: 'guest',
-  email: 'invitado@fluxfit.cl',
-  full_name: 'Invitado',
-  is_premium: false,
-  premium_since: null,
-  avatar_url: '',
-  created_at: new Date().toISOString(),
-};
 
 interface AuthContextType {
   user: User | null;
@@ -31,9 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  // user is ALWAYS null for guests — only isGuest flag distinguishes them
   const [isGuest, setIsGuest] = useState(false);
-  // Prevent getSession + onAuthStateChange race condition on initial load
-  const initializedRef = useRef(false);
 
   const fetchProfile = async (userId: string): Promise<User | null> => {
     const { data } = await supabase
@@ -45,10 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const ensureProfile = async (userId: string, email: string): Promise<User | null> => {
-    // upsert avoids duplicate key errors if profile already exists
-    await supabase
-      .from('users')
-      .upsert({ id: userId, email, full_name: '' }, { onConflict: 'id', ignoreDuplicates: true });
+    // Fetch first — only insert if no profile exists, never overwrite existing data
+    const existing = await fetchProfile(userId);
+    if (existing) return existing;
+    await supabase.from('users').insert({ id: userId, email, full_name: '' });
     return fetchProfile(userId);
   };
 
@@ -60,16 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // onAuthStateChange fires on mount with current session — use it as the
-    // single source of truth so we don't race with getSession().
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+    // onAuthStateChange fires immediately on mount with the current session
+    // (INITIAL_SESSION event). Using it as the single source of truth avoids
+    // racing with a separate getSession() call.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
 
       if (s?.user) {
         (async () => {
-          if (!initializedRef.current) {
-            initializedRef.current = true;
-          }
           setLoading(true);
           const profile = await ensureProfile(s.user.id, s.user.email ?? '');
           setUser(profile);
@@ -77,7 +64,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         })();
       } else {
-        initializedRef.current = true;
         setUser(null);
         setIsGuest(false);
         setLoading(false);
@@ -90,23 +76,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-    // If email confirmation is disabled, user is immediately available
-    if (data.user && data.session) {
+
+    if (data.user) {
+      // Only insert if profile doesn't exist — preserves data on re-registration attempts
       const existing = await fetchProfile(data.user.id);
       if (!existing) {
         await supabase.from('users').insert({ id: data.user.id, email, full_name: fullName });
       }
-    } else if (data.user && !data.session) {
-      // Email confirmation required — store fullName so we can use it when they confirm
-      // We insert a placeholder profile so ensureProfile can update it later
-      await supabase.from('users').upsert({ id: data.user.id, email, full_name: fullName });
     }
+    // If data.session is null, email confirmation is required.
+    // onAuthStateChange will fire once the user confirms and gets a session.
   };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    // onAuthStateChange handles the rest
+    // onAuthStateChange handles setting user/session state
   };
 
   const signOut = async () => {
@@ -116,8 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsGuest(false);
   };
 
+  // enterAsGuest: user stays null, only isGuest=true.
+  // ProtectedRoute allows: user!=null OR isGuest==true.
+  // SplashPage redirects: user!=null OR isGuest==true.
   const enterAsGuest = () => {
-    setUser(GUEST_USER);
     setIsGuest(true);
     setLoading(false);
   };
