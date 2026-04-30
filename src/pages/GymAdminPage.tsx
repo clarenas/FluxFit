@@ -36,6 +36,8 @@ export function GymAdminPage() {
   const [hourForm, setHourForm] = useState({ day_of_week: '1', hour_start: '06:00', hour_end: '08:00', label: '' });
   const [requestingPlan, setRequestingPlan] = useState<string | null>(null);
   const [planRequestSent, setPlanRequestSent] = useState<string | null>(null);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [infoForm, setInfoForm] = useState({ name: '', address: '', comuna: '', phone: '', website: '', description: '' });
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
@@ -56,7 +58,11 @@ export function GymAdminPage() {
       supabase.from('gym_branches').select('*').eq('gym_id', gymId).order('created_at'),
       supabase.from('gym_promotions').select('*').eq('gym_id', gymId).order('created_at'),
     ]);
-    if (gymRes.data) { setGym(gymRes.data); setMaxCapacityEdit(String(gymRes.data.max_capacity)); }
+    if (gymRes.data) {
+      setGym(gymRes.data);
+      setMaxCapacityEdit(String(gymRes.data.max_capacity));
+      setInfoForm({ name: gymRes.data.name, address: gymRes.data.address, comuna: gymRes.data.comuna, phone: gymRes.data.phone, website: gymRes.data.website, description: gymRes.data.description });
+    }
     if (plansRes.data) setPlans(plansRes.data);
     if (servicesRes.data) setServices(servicesRes.data);
     if (discountsRes.data) setDiscounts(discountsRes.data);
@@ -130,6 +136,13 @@ export function GymAdminPage() {
     await supabase.from(table).delete().eq('id', id); fetchAll();
   };
 
+  const saveGymInfo = async () => {
+    if (!gym) return;
+    await supabase.from('gyms').update({ name: infoForm.name, address: infoForm.address, comuna: infoForm.comuna, phone: infoForm.phone, website: infoForm.website, description: infoForm.description }).eq('id', gym.id);
+    setGym(prev => prev ? { ...prev, ...infoForm } : prev);
+    setEditingInfo(false);
+  };
+
   const requestPlan = async (planName: string, planPrice: string) => {
     if (!gym || !user) return;
     setRequestingPlan(planName);
@@ -150,6 +163,7 @@ export function GymAdminPage() {
   if (!gym) return <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center text-[#666]">Cargando panel de administración...</div>;
 
   const plan = subscription?.plan ?? 'free';
+  const canEditInfo = ['basico', 'pro', 'full'].includes(plan);
   const canManagePlans = ['basico', 'pro', 'full'].includes(plan);
   const canManageServices = ['basico', 'pro', 'full'].includes(plan);
   const canManageDiscounts = ['basico', 'pro', 'full'].includes(plan);
@@ -213,6 +227,48 @@ export function GymAdminPage() {
         )}
 
         <div><p className="text-xs text-[#666666] mb-2">Así te ven los usuarios</p><OccupancyHeatmap data={heatmapData} /></div>
+
+        {!canEditInfo ? (
+          <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-[#111]">Información del gym</h3>
+              <span className="text-xs text-[#999]">Plan Básico para editar</span>
+            </div>
+            <p className="text-sm text-[#666]">{gym.address}</p>
+            <p className="text-sm text-[#666]">{gym.phone}</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-[#111]">Información del gym</h3>
+              {!editingInfo && <button onClick={() => setEditingInfo(true)} className="px-3 py-1.5 border border-[#111111] text-[#111111] font-bold rounded-lg text-xs">Editar información</button>}
+            </div>
+            {editingInfo ? (
+              <div className="space-y-2">
+                <input placeholder="Nombre del gym" value={infoForm.name} onChange={e => setInfoForm(p => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]" />
+                <input placeholder="Dirección" value={infoForm.address} onChange={e => setInfoForm(p => ({ ...p, address: e.target.value }))} className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]" />
+                <select value={infoForm.comuna} onChange={e => setInfoForm(p => ({ ...p, comuna: e.target.value }))} className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]">
+                  {['Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'La Reina', 'Peñalolén'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input placeholder="Teléfono" value={infoForm.phone} onChange={e => setInfoForm(p => ({ ...p, phone: e.target.value }))} className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]" />
+                <input placeholder="Sitio web" value={infoForm.website} onChange={e => setInfoForm(p => ({ ...p, website: e.target.value }))} className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]" />
+                <textarea rows={3} placeholder="Descripción" value={infoForm.description} onChange={e => setInfoForm(p => ({ ...p, description: e.target.value }))} className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000] resize-none" />
+                <div className="flex gap-2 pt-1">
+                  <button onClick={saveGymInfo} className="flex-1 py-2 bg-[#CC0000] text-white font-bold rounded-lg text-sm">Guardar</button>
+                  <button onClick={() => setEditingInfo(false)} className="flex-1 py-2 border border-[#E5E5E5] rounded-lg text-sm">Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-sm text-[#111111] font-medium">{gym.name}</p>
+                <p className="text-sm text-[#666]">{gym.address}{gym.comuna ? `, ${gym.comuna}` : ''}</p>
+                {gym.phone && <p className="text-sm text-[#666]">{gym.phone}</p>}
+                {gym.website && <p className="text-sm text-[#CC0000]">{gym.website}</p>}
+                {gym.description && <p className="text-sm text-[#666] mt-1">{gym.description}</p>}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-1 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
           {tabs.map(t => <button key={t.key} onClick={() => { setActiveTab(t.key); setShowAddForm(false); }} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${activeTab === t.key ? 'bg-[#111111] text-white' : 'bg-white text-[#666666] border border-[#E5E5E5]'}`}>{t.label}</button>)}
