@@ -53,6 +53,7 @@ export function AdminFluxFitPage() {
   const [approvalPlan, setApprovalPlan] = useState('basico');
   const [userSearch, setUserSearch] = useState('');
   const [requestFilter, setRequestFilter] = useState('all');
+  const [messageFilter, setMessageFilter] = useState('todos');
 
   const fetchAll = async () => {
     setLoading(true);
@@ -121,6 +122,16 @@ export function AdminFluxFitPage() {
       is_premium: !current,
       premium_since: !current ? new Date().toISOString() : null,
     }).eq('id', userId);
+    fetchAll();
+  };
+
+  const markMessageRead = async (id: string) => {
+    await supabase.from('contact_messages').update({ is_read: true }).eq('id', id);
+    fetchAll();
+  };
+
+  const toggleCommerceActive = async (commerce: any) => {
+    await supabase.from('commerces').update({ is_active: !commerce.is_active }).eq('id', commerce.id);
     fetchAll();
   };
 
@@ -491,11 +502,118 @@ export function AdminFluxFitPage() {
             })()}
           </div>
 
-        ) : (
-          <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
-            Próximamente
+        ) : activeTab === 'mensajes' ? (
+          <div className="space-y-4">
+            {/* Filter chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {['todos', 'Soporte', 'Comercial', 'Solicitud de plan', 'Otro'].map(f => (
+                <button
+                  key={f}
+                  onClick={() => setMessageFilter(f)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                    messageFilter === f ? 'bg-[#CC0000] text-white' : 'bg-white text-[#666] border border-[#E5E5E5]'
+                  }`}
+                >
+                  {f === 'todos' ? 'Todos' : f}
+                </button>
+              ))}
+            </div>
+
+            {(() => {
+              const filtered = messages.filter((m: any) => messageFilter === 'todos' || m.type === messageFilter);
+              const typeBadge = (type: string) => {
+                const styles: Record<string, string> = {
+                  'Soporte': 'bg-amber-100 text-amber-700',
+                  'Comercial': 'bg-blue-100 text-blue-700',
+                  'Solicitud de plan': 'bg-[#7C3AED]/10 text-[#7C3AED]',
+                  'Otro': 'bg-[#F5F5F5] text-[#666]',
+                };
+                return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${styles[type] ?? styles['Otro']}`}>{type}</span>;
+              };
+              if (filtered.length === 0) return (
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                  No hay mensajes
+                </div>
+              );
+              return filtered.map((m: any) => (
+                <div
+                  key={m.id}
+                  className={`bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-2 border-l-4 ${
+                    !m.is_read ? 'border-l-[#CC0000]' : 'border-l-[#E5E5E5]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-[#111] text-sm">{m.name}</p>
+                      <p className="text-xs text-[#666] truncate">{m.email}</p>
+                    </div>
+                    {typeBadge(m.type)}
+                  </div>
+                  <p className="text-sm text-[#444] leading-relaxed">{m.message}</p>
+                  <p className="text-xs text-[#999]">
+                    {new Date(m.created_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                  {!m.is_read && (
+                    <button
+                      onClick={() => markMessageRead(m.id)}
+                      className="w-full py-2 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+                    >
+                      Marcar leído
+                    </button>
+                  )}
+                </div>
+              ));
+            })()}
           </div>
-        )}
+
+        ) : activeTab === 'comercios' ? (
+          <div className="space-y-3">
+            {(() => {
+              const mappedCommerces = commerces.map((c: any) => {
+                const sub = c.commerce_subscriptions?.[0];
+                return { ...c, plan: sub?.plan ?? 'free', sub_status: sub?.status ?? null, valid_until: sub?.valid_until ?? null };
+              });
+              if (mappedCommerces.length === 0) return (
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                  No hay comercios registrados
+                </div>
+              );
+              return mappedCommerces.map((c: any) => (
+                <div key={c.id} className={`bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3 ${!c.is_active ? 'opacity-50' : ''}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-[#111]">{c.name}</p>
+                      {c.category && <p className="text-xs text-[#666] mt-0.5">{c.category}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {planBadge(c.plan)}
+                      {c.is_active
+                        ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Activo</span>
+                        : <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-[#CC0000]">Inactivo</span>
+                      }
+                    </div>
+                  </div>
+                  {c.valid_until && (
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="text-[#666]">Vigencia:</span>
+                      {expiryWarning(c.valid_until)}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => toggleCommerceActive(c)}
+                    className={`w-full py-2 text-sm font-bold rounded-xl active:scale-[0.98] transition-transform ${
+                      c.is_active ? 'border border-[#CC0000] text-[#CC0000]' : 'bg-[#16A34A] text-white'
+                    }`}
+                  >
+                    {c.is_active ? 'Desactivar' : 'Activar'}
+                  </button>
+                </div>
+              ));
+            })()}
+          </div>
+
+        ) : null}
+
       </div>
 
       {/* Approval Modal */}
