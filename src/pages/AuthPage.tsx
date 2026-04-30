@@ -35,7 +35,6 @@ export function AuthPage() {
   const [gymName, setGymName] = useState('');
   const [gymComunas, setGymComunas] = useState<string[]>([]);
   const [gymPhone, setGymPhone] = useState('');
-  const [gymPlan, setGymPlan] = useState('Básico - $59.900/mes');
   const [gymRequestSent, setGymRequestSent] = useState(false);
 
   // Commerce-specific state
@@ -385,7 +384,7 @@ export function AuthPage() {
               if (!userId) throw new Error('No se pudo crear la cuenta');
               await supabase.from('users').insert({ id: userId, email, full_name: fullName, is_premium: false, avatar_url: '', role: 'gym_pending' });
               const { error: reqError } = await supabase.from('gym_admin_requests').insert({
-                user_id: userId, gym_name: gymName, comunas: gymComunas, phone: gymPhone, plan_interest: gymPlan, status: 'pending',
+                user_id: userId, gym_name: gymName, comunas: gymComunas, phone: gymPhone, plan_interest: 'por_definir', status: 'pending',
               });
               if (reqError) throw reqError;
               setGymRequestSent(true);
@@ -430,18 +429,13 @@ export function AuthPage() {
             <label className={labelClass}>Teléfono de contacto</label>
             <input type="tel" value={gymPhone} onChange={e => setGymPhone(e.target.value)} className={inputClass} placeholder="+56 9 1234 5678" required />
           </div>
-          <div>
-            <label className={labelClass}>Plan de interés</label>
-            <select value={gymPlan} onChange={e => setGymPlan(e.target.value)} className={inputClass}>
-              <option>Básico - $59.900/mes</option>
-              <option>Pro - $89.900/mes</option>
-              <option>Full - $149.900/mes</option>
-            </select>
-          </div>
           {error && <p className="text-[#CC0000] text-sm">{error}</p>}
           <button type="submit" disabled={submitting} className={submitClass}>
             {submitting ? 'Enviando...' : 'Enviar solicitud'}
           </button>
+          <p className="text-xs text-[#666] text-center mt-3">
+            Una vez validada tu solicitud podrás ver y contratar los planes disponibles desde tu panel de administración.
+          </p>
         </form>
         <button type="button" onClick={() => setAccountType(null)} className="mt-4 text-sm text-[#666666]">
           Cambiar tipo de cuenta
