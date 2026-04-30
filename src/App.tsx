@@ -35,70 +35,25 @@ function AppShell() {
   const showNav = ['/home', '/favorites', '/premium', '/profile'].some(p =>
     location.pathname.startsWith(p)
   );
-
   return (
-    <div className="w-full md:pl-[200px] min-h-screen bg-[#F5F5F5]">
-      <div className="max-w-[430px] mx-auto md:max-w-full md:mx-0 relative">
-      <Routes>
-
-        <Route path="/" element={<SplashPage />} />
-        <Route path="/auth" element={<AuthPage />} />
-
-        <Route
-          path="/home"
-          element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/gym/:id"
-          element={
-            <ProtectedRoute>
-              <GymProfilePage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/favorites"
-          element={
-            <ProtectedRoute>
-              <FavoritesPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/premium"
-          element={
-            <ProtectedRoute>
-              <PremiumPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route path="/contact" element={<ContactPage />} />
-
-        <Route path="/admin/gym" element={<ProtectedRoute><GymAdminPage /></ProtectedRoute>} />
-        <Route path="/admin/commerce" element={<ProtectedRoute><CommerceAdminPage /></ProtectedRoute>} />
-
-        <Route path="*" element={<Navigate to="/home" replace />} />
-
-      </Routes>
-
+    <div className="min-h-screen bg-[#F5F5F5] flex">
       {showNav && <BottomNav />}
+      <div className={`flex-1 min-w-0 ${showNav ? 'md:ml-[200px]' : ''}`}>
+        <div className="max-w-[430px] mx-auto md:max-w-none">
+          <Routes>
+            <Route path="/" element={<SplashPage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+            <Route path="/gym/:id" element={<ProtectedRoute><GymProfilePage /></ProtectedRoute>} />
+            <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
+            <Route path="/premium" element={<ProtectedRoute><PremiumPage /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/admin/gym" element={<ProtectedRoute><GymAdminPage /></ProtectedRoute>} />
+            <Route path="/admin/commerce" element={<ProtectedRoute><CommerceAdminPage /></ProtectedRoute>} />
+            <Route path="*" element={<Navigate to="/home" replace />} />
+          </Routes>
+        </div>
       </div>
     </div>
   );

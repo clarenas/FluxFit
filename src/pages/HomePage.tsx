@@ -70,7 +70,7 @@ export function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] pb-20">
+    <div className="min-h-screen bg-[#F5F5F5] pb-20 md:max-w-[900px] md:mx-auto">
       <Toast {...toast} />
       <div className="bg-white border-b border-[#E5E5E5] px-4 py-3 flex items-center gap-3 sticky top-0 z-40">
         <FluxFitLogo size="sm" />
