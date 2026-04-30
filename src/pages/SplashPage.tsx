@@ -1,65 +1,39 @@
-import { useEffect } from 'react';
-import { FluxFitLogo } from '../components/FluxFitLogo';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Eye } from 'lucide-react';
+import { FluxFitLogo } from '../components/FluxFitLogo';
+import { supabase } from '../lib/supabase';
 
 export function SplashPage() {
   const navigate = useNavigate();
-  const { enterAsGuest, user, loading, isGuest } = useAuth();
+  const [visible, setVisible] = useState(false);
+  const [taglineVisible, setTaglineVisible] = useState(false);
 
-  // Skip splash if the user already has an active session
   useEffect(() => {
-    if (!loading && (user || isGuest)) {
-      navigate('/home', { replace: true });
-    }
-  }, [user, loading, isGuest, navigate]);
-
-  const handleGuest = () => {
-    enterAsGuest();
-    navigate('/home');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <FluxFitLogo size="lg" />
-      </div>
-    );
-  }
+    const t1 = setTimeout(() => setVisible(true), 100);
+    const t2 = setTimeout(() => setTaglineVisible(true), 500);
+    const t3 = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        navigate('/home', { replace: true });
+      } else {
+        navigate('/auth', { replace: true });
+      }
+    }, 2200);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-8">
-      <FluxFitLogo size="lg" />
-      <div className="w-full max-w-xs mt-12 space-y-3">
-        <button
-          onClick={() => navigate('/auth?mode=register')}
-          className="w-full py-3.5 bg-[#CC0000] text-white font-bold rounded-xl text-base active:scale-[0.98] transition-transform"
-        >
-          Crear cuenta
-        </button>
-        <button
-          onClick={() => navigate('/auth?mode=login')}
-          className="w-full py-3.5 border-2 border-[#111111] text-[#111111] font-bold rounded-xl text-base active:scale-[0.98] transition-transform"
-        >
-          Ya tengo cuenta
-        </button>
-        <div className="relative py-2">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-[#E5E5E5]" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-white px-3 text-xs text-[#999]">o</span>
-          </div>
-        </div>
-        <button
-          onClick={handleGuest}
-          className="w-full py-3.5 border-2 border-[#CC0000]/30 text-[#CC0000] font-bold rounded-xl text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform bg-[#CC0000]/5"
-        >
-          <Eye size={18} />
-          Explorar como invitado
-        </button>
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-4">
+      <div className={`transition-all duration-700 ${
+        visible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+      }`}>
+        <FluxFitLogo size="lg" />
       </div>
+      <p className={`text-[#666666] text-sm transition-all duration-500 ${
+        taglineVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+      }`}>
+        Tu gym. Tu tiempo.
+      </p>
     </div>
   );
 }
