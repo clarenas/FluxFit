@@ -90,6 +90,9 @@ function AppShell() {
 
         <Route path="/contact" element={<ContactPage />} />
 
+        <Route path="/admin/gym" element={<ProtectedRoute><GymAdminPage /></ProtectedRoute>} />
+        <Route path="/admin/commerce" element={<ProtectedRoute><CommerceAdminPage /></ProtectedRoute>} />
+
         <Route path="*" element={<Navigate to="/home" replace />} />
 
       </Routes>

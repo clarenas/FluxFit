@@ -1,34 +1,37 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Eye, Mail } from 'lucide-react';
+import { LogOut, Eye, Mail, Settings, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getInitials, getOccupancyColor, getOccupancyLabel } from '../lib/utils';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import type { Gym } from '../lib/types';
+import { useGyms } from '../hooks/useGyms';
 
 export function ProfilePage() {
   const navigate = useNavigate();
   const { user, signOut, isGuest } = useAuth();
-  const [favGyms, setFavGyms] = useState<Gym[]>([]);
+  const [favIds, setFavIds] = useState<string[]>([]);
+  const [isGymAdmin, setIsGymAdmin] = useState(false);
+  const [isCommerceAdmin, setIsCommerceAdmin] = useState(false);
   const isPremium = user?.is_premium ?? false;
+  const { gyms: allGyms } = useGyms();
+
+  const favGyms = allGyms.filter(g => favIds.includes(g.id));
 
   const fetchFavGyms = useCallback(async () => {
     if (!user || isGuest) return;
     const { data: favs } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
-    if (favs && favs.length > 0) {
-      const { data: gymData } = await supabase.from('gyms').select('*').in('id', favs.map(f => f.gym_id)).eq('is_active', true);
-      if (gymData) setFavGyms(gymData);
-    }
+    setFavIds(favs ? favs.map(f => f.gym_id) : []);
   }, [user, isGuest]);
 
   useEffect(() => { fetchFavGyms(); }, [fetchFavGyms]);
 
   useEffect(() => {
-    const channel = supabase.channel('profile-gyms-realtime').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gyms' }, payload => {
-      setFavGyms(prev => prev.map(g => g.id === payload.new.id ? { ...g, ...payload.new } as Gym : g));
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    if (!user || isGuest) return;
+    supabase.from('gym_admins').select('id').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => setIsGymAdmin(!!data));
+    supabase.from('commerce_admins').select('id').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => setIsCommerceAdmin(!!data));
+  }, [user, isGuest]);
 
   const handleSignOut = async () => { await signOut(); navigate('/'); };
 
@@ -73,6 +76,24 @@ export function ProfilePage() {
         )}
         {!isPremium && (
           <button onClick={() => navigate('/premium')} className="w-full bg-[#CC0000] text-white font-bold rounded-xl p-4 text-left active:scale-[0.98] transition-transform"><p className="font-bold text-lg">✦ Hazte Premium</p><p className="text-white/80 text-sm mt-1">Desbloquea descuentos y precios especiales</p></button>
+        )}
+        {isGymAdmin && (
+          <button onClick={() => navigate('/admin/gym')} className="w-full bg-[#111111] text-white font-bold rounded-xl p-4 flex items-center gap-3 active:scale-[0.98] transition-transform">
+            <Settings size={18} />
+            <div className="text-left">
+              <p className="font-bold">Panel de mi Gym</p>
+              <p className="text-white/70 text-xs font-normal">Métricas y gestión</p>
+            </div>
+          </button>
+        )}
+        {isCommerceAdmin && (
+          <button onClick={() => navigate('/admin/commerce')} className="w-full bg-[#111111] text-white font-bold rounded-xl p-4 flex items-center gap-3 active:scale-[0.98] transition-transform">
+            <Store size={18} />
+            <div className="text-left">
+              <p className="font-bold">Panel de mi Comercio</p>
+              <p className="text-white/70 text-xs font-normal">Productos y cupones</p>
+            </div>
+          </button>
         )}
         <div>
           <h3 className="font-bold text-[#111111] mb-3">Mis gyms guardados</h3>

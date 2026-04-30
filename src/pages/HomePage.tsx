@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Lock, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useGyms } from '../hooks/useGyms';
 import { GymCard } from '../components/GymCard';
 import { BottomSheet } from '../components/BottomSheet';
 import { FluxFitLogo } from '../components/FluxFitLogo';
@@ -10,7 +11,7 @@ import { Toast } from '../components/Toast';
 import { SkeletonList } from '../components/SkeletonList';
 import { useToast } from '../hooks/useToast';
 import { formatCLP, getCommerceCategoryEmoji, getCommerceCategoryLabel } from '../lib/utils';
-import type { Gym, Commerce } from '../lib/types';
+import type { Commerce } from '../lib/types';
 
 type FilterType = 'all' | 'tranquilo' | 'moderado' | 'lleno';
 
@@ -19,43 +20,29 @@ const COMUNAS = ['Todas', 'Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'L
 export function HomePage() {
   const navigate = useNavigate();
   const { user, isGuest } = useAuth();
-  const [gyms, setGyms] = useState<Gym[]>([]);
+  const { gyms, loading: loadingGyms, error: gymsError } = useGyms();
   const [commerces, setCommerces] = useState<Commerce[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const [selectedCommerce, setSelectedCommerce] = useState<Commerce | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [loadingGyms, setLoadingGyms] = useState(true);
   const [selectedComuna, setSelectedComuna] = useState('Todas');
   const { toast, showToast } = useToast();
   const isPremium = user?.is_premium ?? false;
 
-  const fetchGyms = useCallback(async () => {
-    setLoadingGyms(true);
-    try {
-      const { data, error } = await supabase.from('gyms').select('*').eq('is_active', true);
-      if (error) { setFetchError('No se pudo cargar los gyms. Intenta de nuevo.'); }
-      if (data) setGyms(data);
-    } finally {
-      setLoadingGyms(false);
-    }
+  const fetchCommerces = useCallback(async () => {
+    const { data, error } = await supabase.from('commerces').select('*').eq('is_active', true);
+    if (error) { console.error('No se pudo cargar los descuentos.'); }
+    if (data) setCommerces(data);
   }, []);
-  const fetchCommerces = useCallback(async () => { const { data, error } = await supabase.from('commerces').select('*').eq('is_active', true); if (error) { setFetchError('No se pudo cargar los descuentos.'); } if (data) setCommerces(data); }, []);
+
   const fetchFavorites = useCallback(async () => {
     if (!user || isGuest) return;
     const { data } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
     if (data) setFavorites(data.map(f => f.gym_id));
   }, [user, isGuest]);
 
-  useEffect(() => { fetchGyms(); fetchCommerces(); fetchFavorites(); }, [fetchGyms, fetchCommerces, fetchFavorites]);
-
-  useEffect(() => {
-    const channel = supabase.channel('gyms-realtime').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gyms' }, payload => {
-      setGyms(prev => prev.map(g => g.id === payload.new.id ? { ...g, ...payload.new } as Gym : g));
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  useEffect(() => { fetchCommerces(); fetchFavorites(); }, [fetchCommerces, fetchFavorites]);
 
   const toggleFavorite = async (gymId: string) => {
     if (!user || isGuest) return;
@@ -139,7 +126,7 @@ export function HomePage() {
               <button key={f.key} onClick={() => setFilter(f.key)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${filter === f.key ? 'bg-[#CC0000] text-white' : 'bg-white text-[#666666] border border-[#E5E5E5]'}`}>{f.label}</button>
             ))}
           </div>
-          {fetchError && <p className="text-[#CC0000] text-sm text-center py-4">{fetchError}</p>}
+          {gymsError && <p className="text-[#CC0000] text-sm text-center py-4">{gymsError}</p>}
           {loadingGyms ? <SkeletonList /> : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
               {filteredGyms.map(gym => (

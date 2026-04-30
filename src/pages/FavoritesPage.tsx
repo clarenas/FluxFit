@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Eye, GitCompare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useGyms } from '../hooks/useGyms';
 import { GymCard } from '../components/GymCard';
 import { Toast } from '../components/Toast';
 import { SkeletonList } from '../components/SkeletonList';
@@ -77,15 +78,17 @@ export function FavoritesPage() {
   const navigate = useNavigate();
   const { user, isGuest } = useAuth();
   const [tab, setTab] = useState<Tab>('guardados');
-  const [gyms, setGyms] = useState<Gym[]>([]);
+  const [favIds, setFavIds] = useState<string[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [loadingGyms, setLoadingGyms] = useState(true);
   const { toast, showToast } = useToast();
-  const [allGyms, setAllGyms] = useState<Gym[]>([]);
+  const { gyms: allGyms } = useGyms();
   const [gymA, setGymA] = useState<Gym | null>(null);
   const [gymB, setGymB] = useState<Gym | null>(null);
   const [plansA, setPlansA] = useState<GymPlan[]>([]);
   const [plansB, setPlansB] = useState<GymPlan[]>([]);
+
+  const gyms = allGyms.filter(g => favIds.includes(g.id));
 
   const fetchFavorites = useCallback(async () => {
     if (!user || isGuest) return;
@@ -93,30 +96,13 @@ export function FavoritesPage() {
     try {
       const { data: favs, error } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
       if (error) { setFetchError('No se pudieron cargar tus gyms guardados.'); return; }
-      if (favs && favs.length > 0) {
-        const { data: gymData } = await supabase.from('gyms').select('*').in('id', favs.map(f => f.gym_id)).eq('is_active', true);
-        if (gymData) setGyms(gymData);
-      }
+      setFavIds(favs ? favs.map(f => f.gym_id) : []);
     } finally {
       setLoadingGyms(false);
     }
   }, [user, isGuest]);
 
   useEffect(() => { fetchFavorites(); }, [fetchFavorites]);
-
-  useEffect(() => {
-    supabase.from('gyms').select('*').eq('is_active', true).order('name').then(({ data }) => setAllGyms(data ?? []));
-  }, []);
-
-  useEffect(() => {
-    const channel = supabase.channel('fav-gyms-realtime').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gyms' }, payload => {
-      const updated = payload.new as Gym;
-      setGyms(prev => prev.map(g => g.id === updated.id ? { ...g, ...updated } : g));
-      setGymA(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
-      setGymB(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
 
   useEffect(() => {
     if (gymA) supabase.from('gym_plans').select('*').eq('gym_id', gymA.id).eq('is_active', true).then(({ data }) => setPlansA(data ?? []));
@@ -131,7 +117,7 @@ export function FavoritesPage() {
   const toggleFavorite = async (gymId: string) => {
     if (!user || isGuest) return;
     await supabase.from('user_favorite_gyms').delete().eq('user_id', user.id).eq('gym_id', gymId);
-    setGyms(prev => prev.filter(g => g.id !== gymId));
+    setFavIds(prev => prev.filter(id => id !== gymId));
     showToast('Gym eliminado de favoritos', 'info');
   };
 
