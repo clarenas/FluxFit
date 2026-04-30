@@ -60,11 +60,12 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [userSearch, setUserSearch] = useState('');
   const [requestFilter, setRequestFilter] = useState('all');
   const [messageFilter, setMessageFilter] = useState('todos');
+  const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
 
   const fetchAll = async () => {
     setLoading(true);
     const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes] = await Promise.all([
-      supabase.from('gyms').select('*, gym_subscriptions(plan,status,valid_until), gym_branches(id), gym_admins(id)').order('name'),
+      supabase.from('gyms').select('*, gym_subscriptions(plan,plan_price,status,valid_until), gym_branches(id), gym_admins(id)').order('name'),
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('contact_messages').select('*').order('created_at', { ascending: false }),
       supabase.from('gym_admin_requests').select('*, users(email,full_name)').order('created_at', { ascending: false }),
@@ -77,6 +78,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
       return {
         ...g,
         plan: sub?.plan ?? 'free',
+        plan_price: sub?.plan_price ?? 0,
         sub_status: sub?.status ?? null,
         valid_until: sub?.valid_until ?? null,
         branch_count: g.gym_branches?.length ?? 0,
@@ -158,6 +160,50 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const toggleGymActive = async (gym: any) => {
     await supabase.from('gyms').update({ is_active: !gym.is_active }).eq('id', gym.id);
     fetchAll();
+  };
+
+  const PLAN_CONFIG: Record<string, { plan_price: number; max_branches: number }> = {
+    free:  { plan_price: 0,      max_branches: 1 },
+    light: { plan_price: 89900,  max_branches: 3 },
+    pro:   { plan_price: 149900, max_branches: 8 },
+  };
+
+  const updatePartnerPlan = async (gym: any, newPlan: string) => {
+    const config = PLAN_CONFIG[newPlan];
+    if (!config) return;
+    setUpdatingPlan(gym.id);
+    try {
+      const valid_until = new Date(Date.now() + 30 * 86400000).toISOString();
+      // Upsert gym_subscriptions (unique on gym_id)
+      const { data: existing } = await supabase
+        .from('gym_subscriptions')
+        .select('id')
+        .eq('gym_id', gym.id)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from('gym_subscriptions').update({
+          plan: newPlan,
+          plan_price: config.plan_price,
+          status: newPlan === 'free' ? 'inactive' : 'active',
+          valid_until: newPlan === 'free' ? null : valid_until,
+        }).eq('gym_id', gym.id);
+      } else {
+        await supabase.from('gym_subscriptions').insert({
+          gym_id: gym.id,
+          plan: newPlan,
+          plan_price: config.plan_price,
+          status: newPlan === 'free' ? 'inactive' : 'active',
+          valid_until: newPlan === 'free' ? null : valid_until,
+        });
+      }
+
+      // Update gyms.max_branches
+      await supabase.from('gyms').update({ max_branches: config.max_branches }).eq('id', gym.id);
+      fetchAll();
+    } finally {
+      setUpdatingPlan(null);
+    }
   };
 
   const openNewGym = () => {
@@ -372,6 +418,40 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                   <span>{gym.branch_count} sucursal{gym.branch_count !== 1 ? 'es' : ''}</span>
                   <span>{gym.admin_count} admin{gym.admin_count !== 1 ? 's' : ''}</span>
                   {expiryWarning(gym.valid_until)}
+                  {gym.max_branches != null && (
+                    <span className="text-[#999]">máx. {gym.max_branches} suc.</span>
+                  )}
+                </div>
+
+                {/* Plan upgrade selector */}
+                <div className="bg-[#F5F5F5] rounded-xl p-3 space-y-2">
+                  <p className="text-[10px] font-bold text-[#666] uppercase tracking-wider">Cambiar plan</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['free', 'light', 'pro'] as const).map(p => {
+                      const labels: Record<string, string> = { free: 'Free', light: 'Light', pro: 'Pro' };
+                      const prices: Record<string, string> = { free: '$0', light: '$89.900', pro: '$149.900' };
+                      const isCurrent = gym.plan === p;
+                      const isUpdating = updatingPlan === gym.id;
+                      return (
+                        <button
+                          key={p}
+                          disabled={isCurrent || isUpdating}
+                          onClick={() => updatePartnerPlan(gym, p)}
+                          className={`py-2 rounded-lg text-xs font-bold transition-all active:scale-[0.97] disabled:cursor-default ${
+                            isCurrent
+                              ? 'bg-[#CC0000] text-white'
+                              : 'bg-white border border-[#E5E5E5] text-[#444] hover:border-[#CC0000] hover:text-[#CC0000] disabled:opacity-50'
+                          }`}
+                        >
+                          <span className="block">{labels[p]}</span>
+                          <span className={`block text-[9px] font-normal ${isCurrent ? 'text-white/70' : 'text-[#999]'}`}>{prices[p]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {updatingPlan === gym.id && (
+                    <p className="text-[10px] text-[#666] text-center">Actualizando plan...</p>
+                  )}
                 </div>
 
                 <div className="flex gap-2 pt-1">
