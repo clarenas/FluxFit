@@ -49,10 +49,11 @@ export function AuthPage() {
     }
   }, [user, loading, navigate, isReset]);
 
-  // Reset account type when switching to login
   useEffect(() => {
-    if (isLogin) setAccountType(null);
-  }, [isLogin]);
+    if (params.get('mode') !== 'register' && params.get('mode') !== 'reset') {
+      setAccountType(null);
+    }
+  }, [params]);
 
   const inputClass = 'w-full px-4 py-3 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-[#111111] focus:outline-none focus:border-[#CC0000] transition-colors';
   const labelClass = 'text-sm text-[#666666] mb-1 block';
@@ -253,7 +254,7 @@ export function AuthPage() {
             ¿Olvidaste tu <span className="text-[#CC0000] font-bold">contraseña?</span>
           </button>
         </form>
-        <button onClick={() => navigate('/auth?mode=register')} className="mt-4 text-sm text-[#666666]">
+        <button onClick={() => { navigate('/auth?mode=register'); setAccountType(null); }} className="mt-4 text-sm text-[#666666]">
           ¿No tienes cuenta? <span className="text-[#CC0000] font-bold">Regístrate</span>
         </button>
       </div>
