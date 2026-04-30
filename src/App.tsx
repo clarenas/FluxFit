@@ -11,6 +11,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { GymAdminPage } from './pages/GymAdminPage';
 import { CommerceAdminPage } from './pages/CommerceAdminPage';
 import { ContactPage } from './pages/ContactPage';
+import { AdminFluxFitPage } from './pages/AdminFluxFitPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isGuest } = useAuth();
@@ -51,6 +52,7 @@ function AppShell() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/admin/gym" element={<ProtectedRoute><GymAdminPage /></ProtectedRoute>} />
             <Route path="/admin/commerce" element={<ProtectedRoute><CommerceAdminPage /></ProtectedRoute>} />
+            <Route path="/admin/fluxfit" element={<ProtectedRoute><AdminFluxFitPage /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>
         </div>

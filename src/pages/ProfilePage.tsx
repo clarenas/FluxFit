@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Eye, Mail, Settings, Store } from 'lucide-react';
+import { LogOut, Eye, Mail, Settings, Store, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getInitials, getOccupancyColor, getOccupancyLabel } from '../lib/utils';
 import { useState, useEffect, useCallback } from 'react';
@@ -76,6 +76,15 @@ export function ProfilePage() {
         )}
         {!isPremium && (
           <button onClick={() => navigate('/premium')} className="w-full bg-[#CC0000] text-white font-bold rounded-xl p-4 text-left active:scale-[0.98] transition-transform"><p className="font-bold text-lg">✦ Hazte Premium</p><p className="text-white/80 text-sm mt-1">Desbloquea descuentos y precios especiales</p></button>
+        )}
+        {user?.role === 'fluxfit_admin' && (
+          <button onClick={() => navigate('/admin/fluxfit')} className="w-full bg-[#CC0000] text-white font-bold rounded-xl p-4 flex items-center gap-3 active:scale-[0.98] transition-transform">
+            <Shield size={18} />
+            <div className="text-left">
+              <p className="font-bold">Panel FluxFit Admin</p>
+              <p className="text-white/70 text-xs font-normal">Solicitudes y mensajes</p>
+            </div>
+          </button>
         )}
         {isGymAdmin && (
           <button onClick={() => navigate('/admin/gym')} className="w-full bg-[#111111] text-white font-bold rounded-xl p-4 flex items-center gap-3 active:scale-[0.98] transition-transform">
