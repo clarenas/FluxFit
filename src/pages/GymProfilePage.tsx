@@ -9,7 +9,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Toast } from '../components/Toast';
 import { useToast } from '../hooks/useToast';
 import { formatCLP, getServiceCategoryLabel } from '../lib/utils';
-import type { Gym, GymPlan, GymService, GymDiscount, GymRecommendedHour, WeeklyOccupancySummary, OccupancyLog } from '../lib/types';
+import type { Gym, GymPlan, GymService, GymDiscount, GymRecommendedHour, WeeklyOccupancySummary, OccupancyLog, GymBranch } from '../lib/types';
 
 export function GymProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +22,8 @@ export function GymProfilePage() {
   const [discounts, setDiscounts] = useState<GymDiscount[]>([]);
   const [recommendedHours, setRecommendedHours] = useState<GymRecommendedHour[]>([]);
   const [heatmapData, setHeatmapData] = useState<WeeklyOccupancySummary[]>([]);
+  const [branches, setBranches] = useState<GymBranch[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState<GymBranch | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<GymPlan | null>(null);
   const [selectedService, setSelectedService] = useState<GymService | null>(null);
@@ -31,7 +33,7 @@ export function GymProfilePage() {
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
-    const [gymRes, plansRes, servicesRes, discountsRes, hoursRes, heatmapRes, logsRes] = await Promise.all([
+    const [gymRes, plansRes, servicesRes, discountsRes, hoursRes, heatmapRes, logsRes, branchesRes] = await Promise.all([
       supabase.from('gyms').select('*').eq('id', id).maybeSingle(),
       supabase.from('gym_plans').select('*').eq('gym_id', id).eq('is_active', true),
       supabase.from('gym_services').select('*').eq('gym_id', id).eq('is_active', true),
@@ -43,6 +45,7 @@ export function GymProfilePage() {
         .eq('gym_id', id)
         .gte('recorded_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
         .order('recorded_at', { ascending: true }),
+      supabase.from('gym_branches').select('*').eq('gym_id', id).eq('is_active', true).order('created_at'),
     ]);
     if (gymRes.error || !gymRes.data) { setFetchError('No se pudo cargar la información de este gym.'); return; }
     if (gymRes.data) setGym(gymRes.data);
@@ -52,6 +55,7 @@ export function GymProfilePage() {
     if (hoursRes.data) setRecommendedHours(hoursRes.data);
     if (heatmapRes.data) setHeatmapData(heatmapRes.data);
     if (logsRes.data) setTodayLogs(logsRes.data as OccupancyLog[]);
+    if (branchesRes.data) setBranches(branchesRes.data);
     if (user && !isGuest) {
       const { data: fav } = await supabase.from('user_favorite_gyms').select('id').eq('user_id', user.id).eq('gym_id', id).maybeSingle();
       setIsFavorite(!!fav);
@@ -105,10 +109,57 @@ export function GymProfilePage() {
       </div>
 
       <div className="px-4 pt-4 space-y-4">
-        <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
-          <OccupancyGauge percentage={gym.occupancy_percentage} status={gym.occupancy_status} peopleCount={gym.current_count} sensorOnline={gym.sensor_online} lastSensorPing={gym.last_sensor_ping} />
-          <OccupancyHeatmap data={heatmapData} />
-        </div>
+        {(() => {
+          const displayData = selectedBranch ? {
+            percentage: selectedBranch.occupancy_percentage,
+            status: selectedBranch.occupancy_status,
+            peopleCount: selectedBranch.current_count,
+            sensorOnline: selectedBranch.sensor_online,
+            lastSensorPing: selectedBranch.last_sensor_ping,
+          } : {
+            percentage: gym.occupancy_percentage,
+            status: gym.occupancy_status,
+            peopleCount: gym.current_count,
+            sensorOnline: gym.sensor_online,
+            lastSensorPing: gym.last_sensor_ping,
+          };
+          return (
+            <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
+              <div className="space-y-3">
+                <OccupancyGauge percentage={displayData.percentage} status={displayData.status} peopleCount={displayData.peopleCount} sensorOnline={displayData.sensorOnline} lastSensorPing={displayData.lastSensorPing} />
+                {selectedBranch && (
+                  <p className="text-sm text-[#666] flex items-center gap-2">
+                    <MapPin size={14} /> {selectedBranch.address}
+                  </p>
+                )}
+              </div>
+              <OccupancyHeatmap data={heatmapData} />
+            </div>
+          );
+        })()}
+
+        {branches.length > 0 && (
+          <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+            <p className="text-xs font-bold text-[#666] uppercase tracking-wider mb-3">Sucursales</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedBranch(null)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${!selectedBranch ? 'bg-[#CC0000] text-white' : 'bg-[#F5F5F5] text-[#666]'}`}
+              >
+                Principal
+              </button>
+              {branches.map(b => (
+                <button
+                  key={b.id}
+                  onClick={() => setSelectedBranch(b)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${selectedBranch?.id === b.id ? 'bg-[#CC0000] text-white' : 'bg-[#F5F5F5] text-[#666]'}`}
+                >
+                  {b.comuna || b.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {recommendedHours.length > 0 && (
           <div className="flex flex-wrap gap-2">{recommendedHours.map(h => <span key={h.id} className="bg-[#16A34A]/10 text-[#16A34A] text-xs font-medium px-2.5 py-1 rounded-full">{h.label}</span>)}</div>
