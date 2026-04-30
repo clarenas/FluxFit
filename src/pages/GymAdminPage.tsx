@@ -159,13 +159,14 @@ export function GymAdminPage({ initialTab }: Props) {
 
   const saveGymInfo = async () => {
     if (!gym) return;
-    // Save with pending approval for self-managed updates
+    // Save with pending approval — hide from users until FluxFit approves
     await supabase.from('gyms').update({
       name: infoForm.name, address: infoForm.address, comuna: infoForm.comuna,
       phone: infoForm.phone, website: infoForm.website, description: infoForm.description,
       approval_status: 'pending',
+      is_active: false,
     }).eq('id', gym.id);
-    setGym(prev => prev ? { ...prev, ...infoForm, approval_status: 'pending' } : prev);
+    setGym(prev => prev ? { ...prev, ...infoForm, approval_status: 'pending', is_active: false } : prev);
     setIsPending(true);
     setEditingInfo(false);
   };

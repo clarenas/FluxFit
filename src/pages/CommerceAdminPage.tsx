@@ -72,7 +72,7 @@ export function CommerceAdminPage({ initialTab }: Props) {
       address: form.address, website: form.website,
       discount_percentage: parseInt(form.discount_percentage) || 0,
       discount_description: form.discount_description,
-      is_active: form.is_active,
+      is_active: false,
       approval_status: 'pending',
     }).eq('id', commerce.id);
     setIsPending(true);
