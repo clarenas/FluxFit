@@ -33,10 +33,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const ensureProfile = async (userId: string, email: string): Promise<User | null> => {
-    const existing = await fetchProfile(userId);
-    if (existing) return existing;
-    await supabase.from('users').insert({ id: userId, email, full_name: '' });
-    return fetchProfile(userId);
+    // Intentar hasta 5 veces con espera — el trigger puede tardar un momento
+    for (let i = 0; i < 5; i++) {
+      const profile = await fetchProfile(userId);
+      if (profile) return profile;
+      await new Promise(resolve => setTimeout(resolve, 600));
+    }
+    return null;
   };
 
   const refreshProfile = async () => {
