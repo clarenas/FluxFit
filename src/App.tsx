@@ -33,7 +33,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppShell() {
   const location = useLocation();
-  const showNav = ['/home', '/favorites', '/premium', '/profile', '/admin/gym', '/admin/commerce'].some(p =>
+  const showNav = ['/home', '/favorites', '/premium', '/profile', '/admin/gym', '/admin/commerce', '/admin/fluxfit'].some(p =>
     location.pathname.startsWith(p)
   );
   return (
@@ -62,6 +62,9 @@ function AppShell() {
             <Route path="/admin/commerce/premium" element={<ProtectedRoute><CommerceAdminPage initialTab="mi_plan" /></ProtectedRoute>} />
             {/* FluxFit super admin */}
             <Route path="/admin/fluxfit" element={<ProtectedRoute><AdminFluxFitPage /></ProtectedRoute>} />
+            <Route path="/admin/fluxfit/socios" element={<ProtectedRoute><AdminFluxFitPage initialTab="solicitudes" /></ProtectedRoute>} />
+            <Route path="/admin/fluxfit/impacto" element={<ProtectedRoute><AdminFluxFitPage initialTab="impacto" /></ProtectedRoute>} />
+            <Route path="/admin/fluxfit/config" element={<ProtectedRoute><AdminFluxFitPage initialTab="usuarios" /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>
         </div>

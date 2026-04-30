@@ -36,10 +36,12 @@ const EMPTY_FORM = {
   description: '', manager_email: '', plan: 'free', valid_days: '30',
 };
 
-export function AdminFluxFitPage() {
+interface AdminFluxFitProps { initialTab?: string; }
+
+export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('gyms');
+  const [activeTab, setActiveTab] = useState(initialTab ?? 'gyms');
   const [gyms, setGyms] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
@@ -94,6 +96,10 @@ export function AdminFluxFitPage() {
   };
 
   useEffect(() => { fetchAll(); }, []);
+
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     if (user && user.role !== 'fluxfit_admin') {

@@ -1,4 +1,4 @@
-import { Home, Heart, Star, User, LayoutDashboard, GitBranch, Tag, BarChart2, Ticket } from 'lucide-react';
+import { Home, Heart, Star, User, LayoutDashboard, GitBranch, Tag, BarChart2, Ticket, Users, TrendingUp, Settings } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
@@ -27,6 +27,13 @@ const commerceAdminTabs: NavTab[] = [
   { path: '/admin/commerce/premium', label: 'Mi Plan', Icon: Star },
 ];
 
+const fluxfitAdminTabs: NavTab[] = [
+  { path: '/admin/fluxfit', label: 'Dashboard', Icon: LayoutDashboard },
+  { path: '/admin/fluxfit/socios', label: 'Socios', Icon: Users },
+  { path: '/admin/fluxfit/impacto', label: 'Impacto', Icon: TrendingUp },
+  { path: '/admin/fluxfit/config', label: 'Config', Icon: Settings },
+];
+
 export function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -42,12 +49,15 @@ export function BottomNav() {
       .then(({ data }) => setIsCommerceAdmin(!!data));
   }, [user, isGuest]);
 
-  // Determine which tab set to show based on current route and role
+  const isFluxfitAdmin = user?.role === 'fluxfit_admin';
   const onGymAdmin = location.pathname.startsWith('/admin/gym');
   const onCommerceAdmin = location.pathname.startsWith('/admin/commerce');
+  const onFluxfitAdmin = location.pathname.startsWith('/admin/fluxfit');
 
   let tabs: NavTab[];
-  if (onGymAdmin && isGymAdmin) {
+  if (onFluxfitAdmin && isFluxfitAdmin) {
+    tabs = fluxfitAdminTabs;
+  } else if (onGymAdmin && isGymAdmin) {
     tabs = gymAdminTabs;
   } else if (onCommerceAdmin && isCommerceAdmin) {
     tabs = commerceAdminTabs;
@@ -56,7 +66,7 @@ export function BottomNav() {
   }
 
   const isActive = (path: string) => {
-    if (path === '/admin/gym' || path === '/admin/commerce') {
+    if (path === '/admin/gym' || path === '/admin/commerce' || path === '/admin/fluxfit') {
       return location.pathname === path;
     }
     return location.pathname.startsWith(path);

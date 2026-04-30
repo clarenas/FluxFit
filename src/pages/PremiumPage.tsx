@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, X, Star } from 'lucide-react';
+import { Check, X, Star, TrendingUp } from 'lucide-react';
 import { FluxFitLogo } from '../components/FluxFitLogo';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -66,6 +66,26 @@ export function PremiumPage() {
   const [requesting, setRequesting] = useState<string | null>(null);
 
   const isPremium = user?.is_premium ?? false;
+  const isFluxfitAdmin = user?.role === 'fluxfit_admin';
+
+  // Revenue data for fluxfit_admin view
+  const [adminRevenue, setAdminRevenue] = useState<{ gymRevenue: number; commerceRevenue: number; premiumUsers: number; totalRedemptions: number } | null>(null);
+
+  useEffect(() => {
+    if (!isFluxfitAdmin) return;
+    const PLAN_PRICES: Record<string, number> = { basico: 59900, light: 89900, pro: 149900, full: 149900, basic: 39900, premium_commerce: 69900 };
+    Promise.all([
+      supabase.from('gym_subscriptions').select('plan, status'),
+      supabase.from('commerce_subscriptions').select('plan, status'),
+      supabase.from('users').select('is_premium'),
+      supabase.from('coupon_redemptions').select('id'),
+    ]).then(([gymSubs, commerceSubs, users, redemptions]) => {
+      const gymRevenue = (gymSubs.data ?? []).filter((s: any) => s.status === 'active' && s.plan !== 'free').reduce((acc: number, s: any) => acc + (PLAN_PRICES[s.plan] ?? 0), 0);
+      const commerceRevenue = (commerceSubs.data ?? []).filter((s: any) => s.status === 'active').reduce((acc: number, s: any) => acc + (PLAN_PRICES[s.plan] ?? 0), 0);
+      const premiumUsers = (users.data ?? []).filter((u: any) => u.is_premium).length * 2990;
+      setAdminRevenue({ gymRevenue, commerceRevenue, premiumUsers, totalRedemptions: redemptions.data?.length ?? 0 });
+    });
+  }, [isFluxfitAdmin]);
 
   useEffect(() => {
     if (!user) return;
@@ -110,6 +130,54 @@ export function PremiumPage() {
       setRequesting(null);
     }
   };
+
+  if (isFluxfitAdmin) {
+    const total = (adminRevenue?.gymRevenue ?? 0) + (adminRevenue?.commerceRevenue ?? 0) + (adminRevenue?.premiumUsers ?? 0);
+    return (
+      <div className="min-h-screen bg-[#F5F5F5] pb-20">
+        <div className="bg-[#111111] px-4 pt-12 pb-8">
+          <div className="flex items-center gap-3">
+            <TrendingUp size={28} className="text-[#CC0000]" />
+            <div>
+              <p className="text-white/60 text-xs">FluxFit Admin</p>
+              <h1 className="text-white font-bold text-xl">Ingresos de la Red</h1>
+            </div>
+          </div>
+        </div>
+        <div className="px-4 -mt-2 space-y-4 pt-4">
+          <div className="bg-[#CC0000] rounded-2xl p-5 text-white">
+            <p className="text-white/70 text-sm">Ingresos totales estimados / mes</p>
+            <p className="text-4xl font-bold mt-1">{formatCLP(total)}</p>
+            <p className="text-white/60 text-xs mt-2">Suma de suscripciones activas de gyms, comercios y usuarios Premium</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {[
+              { label: 'Suscripciones de Gyms', value: adminRevenue?.gymRevenue ?? 0, desc: 'Planes Light, Pro y Full activos' },
+              { label: 'Suscripciones de Comercios', value: adminRevenue?.commerceRevenue ?? 0, desc: 'Planes Basic y Premium activos' },
+              { label: 'Membresías Premium de Usuarios', value: adminRevenue?.premiumUsers ?? 0, desc: `${Math.round((adminRevenue?.premiumUsers ?? 0) / 2990)} usuarios Premium a $2.990/mes` },
+            ].map(item => (
+              <div key={item.label} className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-[#111] text-sm">{item.label}</p>
+                    <p className="text-xs text-[#999] mt-0.5">{item.desc}</p>
+                  </div>
+                  <p className="text-[#111] font-bold text-base flex-shrink-0 ml-3">{formatCLP(item.value)}</p>
+                </div>
+              </div>
+            ))}
+            <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 flex items-center justify-between">
+              <div>
+                <p className="font-bold text-[#111] text-sm">Canjes Generados</p>
+                <p className="text-xs text-[#999] mt-0.5">Total de cupones redimidos en la red</p>
+              </div>
+              <p className="text-[#CC0000] font-bold text-2xl">{adminRevenue?.totalRedemptions ?? 0}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isGuest) {
     return (

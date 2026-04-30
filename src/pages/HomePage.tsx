@@ -20,6 +20,14 @@ const COMUNAS = ['Todas', 'Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'L
 export function HomePage() {
   const navigate = useNavigate();
   const { user, isGuest } = useAuth();
+
+  // FluxFit admins go directly to their dashboard
+  useEffect(() => {
+    if (user?.role === 'fluxfit_admin') {
+      navigate('/admin/fluxfit', { replace: true });
+    }
+  }, [user, navigate]);
+
   const { gyms, loading: loadingGyms, error: gymsError } = useGyms();
   const [commerces, setCommerces] = useState<Commerce[]>([]);
   const [commercesError, setCommercesError] = useState<string | null>(null);
