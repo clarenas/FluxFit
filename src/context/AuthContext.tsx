@@ -32,12 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data;
   };
 
-  const ensureProfile = async (userId: string, email: string): Promise<User | null> => {
-    // Intentar hasta 5 veces con espera — el trigger puede tardar un momento
-    for (let i = 0; i < 5; i++) {
+  const waitForProfile = async (userId: string): Promise<User | null> => {
+    for (let i = 0; i < 10; i++) {
       const profile = await fetchProfile(userId);
       if (profile) return profile;
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     return null;
   };
@@ -50,50 +49,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      if (session?.user) {
-        const profile = await ensureProfile(session.user.id, session.user.email ?? '');
-        setUser(profile);
-        setIsGuest(false);
-      }
-      setLoading(false);
-      if (!session?.user) {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      setSession(currentSession);
+
+      if (currentSession?.user) {
+        const profile = await waitForProfile(currentSession.user.id);
+        if (mounted) {
+          setUser(profile);
+          setIsGuest(false);
+        }
+      } else {
         const savedGuest = sessionStorage.getItem('fluxfit_guest');
-        if (savedGuest === 'true') setIsGuest(true);
+        if (savedGuest === 'true' && mounted) setIsGuest(true);
       }
+
+      if (mounted) setLoading(false);
     };
 
     init();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      if (s?.user) {
-        (async () => {
-          setLoading(true);
-          const profile = await ensureProfile(s.user.id, s.user.email ?? '');
-          setUser(profile);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (!mounted) return;
+
+      setSession(newSession);
+
+      if (newSession?.user) {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          (async () => {
+            const profile = await waitForProfile(newSession.user.id);
+            if (mounted) {
+              setUser(profile);
+              setIsGuest(false);
+              setLoading(false);
+            }
+          })();
+        }
+      } else {
+        if (mounted) {
+          setUser(null);
           setIsGuest(false);
           setLoading(false);
-        })();
-      } else {
-        setUser(null);
-        setIsGuest(false);
-        setLoading(false);
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-    // El trigger handle_new_user crea el perfil automáticamente
-    // Solo esperamos un momento para que el trigger se ejecute
     if (data.user) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const profile = await waitForProfile(data.user.id);
+      if (profile && fullName) {
+        await supabase.from('users').update({ full_name: fullName }).eq('id', data.user.id);
+        setUser({ ...profile, full_name: fullName });
+      } else {
+        setUser(profile);
+      }
     }
   };
 

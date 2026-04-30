@@ -9,6 +9,15 @@ type AccountType = 'usuario' | 'gym' | 'comercio';
 
 const COMUNAS = ['Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'La Reina', 'Peñalolén'];
 
+const waitForProfile = async (userId: string) => {
+  for (let i = 0; i < 10; i++) {
+    const { data } = await supabase.from('users').select('id').eq('id', userId).maybeSingle();
+    if (data) return data;
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  return null;
+};
+
 export function AuthPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -382,8 +391,10 @@ export function AuthPage() {
               if (signUpError) throw signUpError;
               const userId = signUpData.user?.id;
               if (!userId) throw new Error('No se pudo crear la cuenta');
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              await supabase.from('users').update({ full_name: fullName, role: 'gym_pending' }).eq('id', userId);
+              const gymProfile = await waitForProfile(userId);
+              if (gymProfile) {
+                await supabase.from('users').update({ full_name: fullName, role: 'gym_pending' }).eq('id', userId);
+              }
               const { error: reqError } = await supabase.from('gym_admin_requests').insert({
                 user_id: userId, gym_name: gymName, comunas: gymComunas, phone: gymPhone, plan_interest: 'por_definir', status: 'pending',
               });
@@ -458,8 +469,10 @@ export function AuthPage() {
             if (signUpError) throw signUpError;
             const userId = signUpData.user?.id;
             if (!userId) throw new Error('No se pudo crear la cuenta');
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            await supabase.from('users').update({ full_name: fullName }).eq('id', userId);
+            const commerceProfile = await waitForProfile(userId);
+            if (commerceProfile) {
+              await supabase.from('users').update({ full_name: fullName }).eq('id', userId);
+            }
             const { data: commerceData, error: commerceError } = await supabase
               .from('commerces')
               .insert({ name: commerceName, category: commerceCategory, phone: commercePhone, description: '', is_active: true })
