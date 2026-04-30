@@ -33,7 +33,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppShell() {
   const location = useLocation();
-  const showNav = ['/home', '/favorites', '/premium', '/profile'].some(p =>
+  const showNav = ['/home', '/favorites', '/premium', '/profile', '/admin/gym', '/admin/commerce'].some(p =>
     location.pathname.startsWith(p)
   );
   return (
@@ -50,8 +50,17 @@ function AppShell() {
             <Route path="/premium" element={<ProtectedRoute><PremiumPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/contact" element={<ContactPage />} />
+            {/* Gym admin routes — all render GymAdminPage with tab param */}
             <Route path="/admin/gym" element={<ProtectedRoute><GymAdminPage /></ProtectedRoute>} />
+            <Route path="/admin/gym/branches" element={<ProtectedRoute><GymAdminPage initialTab="sucursales" /></ProtectedRoute>} />
+            <Route path="/admin/gym/offers" element={<ProtectedRoute><GymAdminPage initialTab="planes" /></ProtectedRoute>} />
+            <Route path="/admin/gym/premium" element={<ProtectedRoute><GymAdminPage initialTab="mi_plan" /></ProtectedRoute>} />
+            {/* Commerce admin routes */}
             <Route path="/admin/commerce" element={<ProtectedRoute><CommerceAdminPage /></ProtectedRoute>} />
+            <Route path="/admin/commerce/coupons" element={<ProtectedRoute><CommerceAdminPage initialTab="cupones" /></ProtectedRoute>} />
+            <Route path="/admin/commerce/stats" element={<ProtectedRoute><CommerceAdminPage initialTab="estadisticas" /></ProtectedRoute>} />
+            <Route path="/admin/commerce/premium" element={<ProtectedRoute><CommerceAdminPage initialTab="mi_plan" /></ProtectedRoute>} />
+            {/* FluxFit super admin */}
             <Route path="/admin/fluxfit" element={<ProtectedRoute><AdminFluxFitPage /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>

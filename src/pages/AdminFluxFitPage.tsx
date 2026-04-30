@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Plus, X } from 'lucide-react';
+import { ArrowLeft, Shield, Plus, X, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { formatCLP } from '../lib/utils';
 
 const COMUNAS = ['Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'La Reina', 'Peñalolén'];
 const PLAN_PRICES: Record<string, number> = { basico: 59900, pro: 89900, full: 149900 };
@@ -44,6 +45,9 @@ export function AdminFluxFitPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [commerces, setCommerces] = useState<any[]>([]);
+  const [redemptions, setRedemptions] = useState<any[]>([]);
+  const [pendingGyms, setPendingGyms] = useState<any[]>([]);
+  const [pendingCommerces, setPendingCommerces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showGymModal, setShowGymModal] = useState(false);
   const [editingGym, setEditingGym] = useState<any>(null);
@@ -57,12 +61,13 @@ export function AdminFluxFitPage() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes] = await Promise.all([
+    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes] = await Promise.all([
       supabase.from('gyms').select('*, gym_subscriptions(plan,status,valid_until), gym_branches(id), gym_admins(id)').order('name'),
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('contact_messages').select('*').order('created_at', { ascending: false }),
       supabase.from('gym_admin_requests').select('*, users(email,full_name)').order('created_at', { ascending: false }),
       supabase.from('commerces').select('*, commerce_subscriptions(plan,status,valid_until)').order('name'),
+      supabase.from('coupon_redemptions').select('*').order('redeemed_at', { ascending: false }),
     ]);
 
     const mappedGyms = (gymsRes.data ?? []).map((g: any) => {
@@ -82,6 +87,9 @@ export function AdminFluxFitPage() {
     setMessages(messagesRes.data ?? []);
     setRequests(requestsRes.data ?? []);
     setCommerces(commercesRes.data ?? []);
+    setRedemptions(redemptionsRes.data ?? []);
+    setPendingGyms(mappedGyms.filter((g: any) => g.approval_status === 'pending'));
+    setPendingCommerces((commercesRes.data ?? []).filter((c: any) => c.approval_status === 'pending'));
     setLoading(false);
   };
 
@@ -239,10 +247,17 @@ export function AdminFluxFitPage() {
   const monthlyRevenue = gyms
     .filter(g => g.sub_status === 'active' && g.plan !== 'free')
     .reduce((sum, g) => sum + (PLAN_PRICES[g.plan] ?? 0), 0);
+  const totalRedemptions = redemptions.length;
+  const thisMonthRedemptions = redemptions.filter((r: any) => new Date(r.redeemed_at) > new Date(Date.now() - 30 * 86400000)).length;
+  const premiumUsers = users.filter((u: any) => u.is_premium).length;
+
+  const pendingCount = pendingGyms.length + pendingCommerces.length;
 
   const tabs = [
     { id: 'gyms', label: 'Gyms' },
     { id: 'solicitudes', label: 'Solicitudes' },
+    { id: 'pendientes', label: pendingCount > 0 ? `Pendientes (${pendingCount})` : 'Pendientes' },
+    { id: 'impacto', label: 'Impacto' },
     { id: 'usuarios', label: 'Usuarios' },
     { id: 'mensajes', label: 'Mensajes' },
     { id: 'comercios', label: 'Comercios' },
@@ -295,6 +310,11 @@ export function AdminFluxFitPage() {
               <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
                 <p className="text-lg font-bold text-[#111]">${monthlyRevenue.toLocaleString('es-CL')}</p>
                 <p className="text-xs text-[#666] mt-0.5">Ingresos est. mes</p>
+              </div>
+              <div className="bg-[#CC0000] rounded-xl p-4 text-center col-span-2">
+                <p className="text-2xl font-bold text-white">{totalRedemptions}</p>
+                <p className="text-xs text-white/80 mt-0.5">Ventas Generadas (canjes totales)</p>
+                <p className="text-xs text-white/60 mt-0.5">{thisMonthRedemptions} este mes · {premiumUsers} usuarios Premium</p>
               </div>
             </div>
 
@@ -576,6 +596,127 @@ export function AdminFluxFitPage() {
                 </div>
               ));
             })()}
+          </div>
+
+        ) : activeTab === 'pendientes' ? (
+          <div className="space-y-4">
+            {pendingCount === 0 && (
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                No hay perfiles pendientes de aprobación
+              </div>
+            )}
+            {pendingGyms.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-[#666] uppercase tracking-wider">Gyms pendientes ({pendingGyms.length})</p>
+                {pendingGyms.map((gym: any) => (
+                  <div key={gym.id} className="bg-white rounded-xl border-2 border-amber-400 p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-[#111]">{gym.name}</p>
+                        <p className="text-xs text-[#666]">{gym.comuna}</p>
+                        {gym.address && <p className="text-xs text-[#999] mt-0.5">{gym.address}</p>}
+                      </div>
+                      <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Pendiente</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => { await supabase.from('gyms').update({ approval_status: 'approved', is_active: true }).eq('id', gym.id); fetchAll(); }}
+                        className="flex-1 py-2 bg-[#16A34A] text-white text-sm font-bold rounded-xl flex items-center justify-center gap-1"
+                      >
+                        <CheckCircle size={14} /> Aprobar
+                      </button>
+                      <button
+                        onClick={async () => { await supabase.from('gyms').update({ approval_status: 'rejected', is_active: false }).eq('id', gym.id); fetchAll(); }}
+                        className="flex-1 py-2 border-2 border-[#CC0000] text-[#CC0000] text-sm font-bold rounded-xl flex items-center justify-center gap-1"
+                      >
+                        <XCircle size={14} /> Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {pendingCommerces.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-[#666] uppercase tracking-wider">Comercios pendientes ({pendingCommerces.length})</p>
+                {pendingCommerces.map((c: any) => (
+                  <div key={c.id} className="bg-white rounded-xl border-2 border-amber-400 p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-[#111]">{c.name}</p>
+                        <p className="text-xs text-[#666]">{c.category}</p>
+                        {c.description && <p className="text-xs text-[#999] mt-0.5">{c.description}</p>}
+                      </div>
+                      <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Pendiente</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => { await supabase.from('commerces').update({ approval_status: 'approved', is_active: true }).eq('id', c.id); fetchAll(); }}
+                        className="flex-1 py-2 bg-[#16A34A] text-white text-sm font-bold rounded-xl flex items-center justify-center gap-1"
+                      >
+                        <CheckCircle size={14} /> Aprobar
+                      </button>
+                      <button
+                        onClick={async () => { await supabase.from('commerces').update({ approval_status: 'rejected', is_active: false }).eq('id', c.id); fetchAll(); }}
+                        className="flex-1 py-2 border-2 border-[#CC0000] text-[#CC0000] text-sm font-bold rounded-xl flex items-center justify-center gap-1"
+                      >
+                        <XCircle size={14} /> Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        ) : activeTab === 'impacto' ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#CC0000] rounded-xl p-4 text-center col-span-2">
+                <p className="text-3xl font-bold text-white">{totalRedemptions}</p>
+                <p className="text-sm text-white/80 mt-1">Ventas Generadas</p>
+                <p className="text-xs text-white/60 mt-0.5">Suma total de cupones redimidos en la red FluxFit</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <p className="text-2xl font-bold text-[#111]">{thisMonthRedemptions}</p>
+                <p className="text-xs text-[#666] mt-0.5">Canjes este mes</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <p className="text-2xl font-bold text-[#111]">{premiumUsers}</p>
+                <p className="text-xs text-[#666] mt-0.5">Usuarios Premium</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <p className="text-2xl font-bold text-[#111]">{redemptions.filter((r: any) => r.gym_id).length}</p>
+                <p className="text-xs text-[#666] mt-0.5">Canjes en Gyms</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <p className="text-2xl font-bold text-[#111]">{redemptions.filter((r: any) => r.commerce_id).length}</p>
+                <p className="text-xs text-[#666] mt-0.5">Canjes en Comercios</p>
+              </div>
+            </div>
+            {redemptions.length > 0 && (
+              <div className="bg-white rounded-xl border border-[#E5E5E5] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#F5F5F5]">
+                  <p className="font-bold text-sm text-[#111]">Últimos canjes registrados</p>
+                </div>
+                <div className="divide-y divide-[#F5F5F5]">
+                  {redemptions.slice(0, 15).map((r: any) => (
+                    <div key={r.id} className="px-4 py-2.5 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-[#111] font-mono">{r.coupon_code.slice(0, 28)}...</p>
+                        <p className="text-[10px] text-[#999]">{new Date(r.redeemed_at).toLocaleString('es-CL')} · {r.gym_id ? 'Gym' : 'Comercio'}</p>
+                      </div>
+                      <span className="text-[10px] font-bold text-[#16A34A]">Canjeado</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {redemptions.length === 0 && (
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                Aún no hay canjes registrados en la red
+              </div>
+            )}
           </div>
 
         ) : activeTab === 'comercios' ? (

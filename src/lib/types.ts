@@ -32,6 +32,7 @@ export interface Gym {
   sensor_online: boolean;
   sensor_key: string;
   is_active: boolean;
+  approval_status: 'pending' | 'approved' | 'rejected';
   created_at: string;
 }
 
@@ -109,7 +110,18 @@ export interface Commerce {
   discount_percentage: number;
   discount_description: string;
   is_active: boolean;
+  approval_status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+}
+
+export interface CouponRedemption {
+  id: string;
+  user_id: string;
+  commerce_id: string | null;
+  gym_id: string | null;
+  coupon_code: string;
+  redeemed_at: string;
+  validated_by: string | null;
 }
 
 export interface UserFavoriteGym {
