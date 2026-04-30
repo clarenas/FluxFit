@@ -25,7 +25,7 @@ export function GymCard({ gym, isFavorite, onToggleFavorite, onClick }: Props) {
         {showFree ? (
           <div className="absolute top-2 right-2 flex items-center gap-1 bg-[#16A34A] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            Ahora libre
+            Tranquilo
           </div>
         ) : (
           <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-white text-[10px] font-bold" style={{ backgroundColor: statusColor }}>
