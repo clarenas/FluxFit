@@ -87,6 +87,12 @@ export function AdminFluxFitPage() {
 
   useEffect(() => { fetchAll(); }, []);
 
+  useEffect(() => {
+    if (user && user.role !== 'fluxfit_admin') {
+      navigate('/home', { replace: true });
+    }
+  }, [user, navigate]);
+
   const approveRequest = async () => {
     if (!approvingRequest) return;
     const req = approvingRequest;
@@ -176,12 +182,18 @@ export function AdminFluxFitPage() {
 
       if (editingGym) {
         await supabase.from('gyms').update(gymPayload).eq('id', editingGym.id);
-        if (gymForm.plan !== 'free') {
-          const valid_until = new Date(Date.now() + Number(gymForm.valid_days) * 86400000).toISOString();
-          await supabase.from('gym_subscriptions').upsert(
+        const valid_until = gymForm.plan === 'free'
+          ? null
+          : new Date(Date.now() + Number(gymForm.valid_days) * 86400000).toISOString();
+        const { error: subErr } = await supabase
+          .from('gym_subscriptions')
+          .upsert(
             { gym_id: editingGym.id, plan: gymForm.plan, status: 'active', valid_until },
             { onConflict: 'gym_id' }
           );
+        if (subErr) {
+          alert('Error al actualizar plan: ' + subErr.message);
+          return;
         }
       } else {
         const { data: newGym, error: gymErr } = await supabase
@@ -320,12 +332,12 @@ export function AdminFluxFitPage() {
                 <div>
                   <div className="flex justify-between text-xs text-[#666] mb-1">
                     <span>Ocupación</span>
-                    <span>{gym.current_occupancy ?? 0}/{gym.max_capacity ?? '?'}</span>
+                    <span>{gym.current_count ?? 0}/{gym.max_capacity ?? '?'}</span>
                   </div>
                   <div className="h-1.5 bg-[#F5F5F5] rounded-full overflow-hidden">
                     <div
                       className="h-full bg-[#CC0000] rounded-full transition-all"
-                      style={{ width: gym.max_capacity ? `${Math.min(100, ((gym.current_occupancy ?? 0) / gym.max_capacity) * 100)}%` : '0%' }}
+                      style={{ width: gym.max_capacity ? `${Math.min(100, ((gym.current_count ?? 0) / gym.max_capacity) * 100)}%` : '0%' }}
                     />
                   </div>
                 </div>
@@ -568,6 +580,13 @@ export function AdminFluxFitPage() {
 
         ) : activeTab === 'comercios' ? (
           <div className="space-y-3">
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => alert('Próximamente: agregar comercio desde admin')}
+                className="px-4 py-2 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform">
+                + Agregar comercio
+              </button>
+            </div>
             {(() => {
               const mappedCommerces = commerces.map((c: any) => {
                 const sub = c.commerce_subscriptions?.[0];
