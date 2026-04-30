@@ -10,6 +10,7 @@ export interface User {
   premium_since: string | null;
   avatar_url: string;
   created_at: string;
+  role: string;
 }
 
 export interface Gym {
@@ -129,5 +130,72 @@ export interface CommerceAdmin {
   id: string;
   user_id: string;
   commerce_id: string;
+  created_at: string;
+}
+
+export interface GymBranch {
+  id: string;
+  gym_id: string;
+  name: string;
+  address: string;
+  comuna: string;
+  phone: string;
+  current_count: number;
+  max_capacity: number;
+  occupancy_percentage: number;
+  occupancy_status: OccupancyStatus;
+  last_sensor_ping: string | null;
+  sensor_online: boolean;
+  sensor_key: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface GymPromotion {
+  id: string;
+  gym_id: string;
+  name: string;
+  description: string;
+  discount_percentage: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CommerceStore {
+  id: string;
+  commerce_id: string;
+  name: string;
+  address: string;
+  comuna: string;
+  phone: string;
+  schedule: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CommerceProduct {
+  id: string;
+  commerce_id: string;
+  name: string;
+  description: string;
+  price: number;
+  premium_price: number;
+  image_url: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CommerceCoupon {
+  id: string;
+  commerce_id: string;
+  code: string;
+  description: string;
+  discount_percentage: number;
+  expires_at: string | null;
+  max_uses: number | null;
+  current_uses: number;
+  is_active: boolean;
   created_at: string;
 }
