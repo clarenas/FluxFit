@@ -1,24 +1,19 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, X } from 'lucide-react';
 import { FluxFitLogo } from '../components/FluxFitLogo';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
 import { formatCLP } from '../lib/utils';
+import { useToast } from '../hooks/useToast';
+import { Toast } from '../components/Toast';
 
 export function PremiumPage() {
   const navigate = useNavigate();
-  const { user, refreshProfile, isGuest } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const { user, isGuest } = useAuth();
+  const { toast, showToast } = useToast();
   const isPremium = user?.is_premium ?? false;
 
-  const activatePremium = async () => {
-    if (!user || isGuest) return;
-    setLoading(true);
-    try {
-      await supabase.from('users').update({ is_premium: true, premium_since: new Date().toISOString() }).eq('id', user.id);
-      await refreshProfile();
-    } finally { setLoading(false); }
+  const handlePremium = () => {
+    showToast('Próximamente podrás suscribirte desde aquí. Por ahora contáctanos a cvlarenas@gmail.com', 'info');
   };
 
   const features = ['Precios especiales en todos los gyms', 'Descuentos en comercios asociados', 'Precios rebajados en servicios internos', 'Distintivo Premium en tu perfil'];
@@ -30,6 +25,7 @@ export function PremiumPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-20">
+      <Toast {...toast} />
       <div className="bg-[#CC0000] px-4 pt-12 pb-8 text-center">
         <FluxFitLogo size="sm" />
         <h1 className="text-white font-bold text-2xl mt-4">FluxFit Premium</h1>
@@ -68,7 +64,7 @@ export function PremiumPage() {
         ) : isGuest ? (
           <button onClick={() => navigate('/auth?mode=register')} className="w-full py-4 bg-[#CC0000] text-white font-bold rounded-xl text-lg active:scale-[0.98] transition-transform">Crea tu cuenta para activar Premium</button>
         ) : (
-          <button onClick={activatePremium} disabled={loading} className="w-full py-4 bg-[#CC0000] text-white font-bold rounded-xl text-lg active:scale-[0.98] transition-transform disabled:opacity-50">{loading ? 'Activando...' : 'Activar FluxFit Premium'}</button>
+          <button onClick={handlePremium} className="w-full py-4 bg-[#CC0000] text-white font-bold rounded-xl text-lg active:scale-[0.98] transition-transform">Activar FluxFit Premium</button>
         )}
         <p className="text-center text-xs text-[#999]">Pago seguro. Cancela cuando quieras.</p>
       </div>
