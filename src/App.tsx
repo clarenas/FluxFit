@@ -36,10 +36,10 @@ function AppShell() {
     location.pathname.startsWith(p)
   );
   return (
-    <div className="min-h-screen bg-[#F5F5F5] flex">
+    <div className="min-h-screen bg-[#F5F5F5]">
       {showNav && <BottomNav />}
-      <div className={`flex-1 min-w-0 ${showNav ? 'md:ml-[200px]' : ''}`}>
-        <div className="max-w-[430px] mx-auto md:max-w-none">
+      <div className={showNav ? 'md:ml-[200px]' : ''}>
+        <div className="max-w-[430px] mx-auto md:max-w-[900px]">
           <Routes>
             <Route path="/" element={<SplashPage />} />
             <Route path="/auth" element={<AuthPage />} />
