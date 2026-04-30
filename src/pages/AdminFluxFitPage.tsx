@@ -49,6 +49,10 @@ export function AdminFluxFitPage() {
   const [editingGym, setEditingGym] = useState<any>(null);
   const [gymForm, setGymForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [approvingRequest, setApprovingRequest] = useState<any>(null);
+  const [approvalPlan, setApprovalPlan] = useState('basico');
+  const [userSearch, setUserSearch] = useState('');
+  const [requestFilter, setRequestFilter] = useState('all');
 
   const fetchAll = async () => {
     setLoading(true);
@@ -81,6 +85,44 @@ export function AdminFluxFitPage() {
   };
 
   useEffect(() => { fetchAll(); }, []);
+
+  const approveRequest = async () => {
+    if (!approvingRequest) return;
+    const req = approvingRequest;
+    const { data: newGym, error } = await supabase
+      .from('gyms')
+      .insert({ name: req.gym_name, comuna: req.comunas?.[0] ?? '', phone: req.phone, is_active: true })
+      .select('id')
+      .single();
+    if (error) return;
+    const gymId = newGym.id;
+    const valid_until = new Date(Date.now() + 30 * 86400000).toISOString();
+    await Promise.all([
+      supabase.from('gym_admins').insert({ user_id: req.user_id, gym_id: gymId }),
+      supabase.from('gym_subscriptions').insert({ gym_id: gymId, plan: approvalPlan, status: 'active', valid_until }),
+      supabase.from('gym_admin_requests').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', req.id),
+    ]);
+    setApprovingRequest(null);
+    fetchAll();
+  };
+
+  const rejectRequest = async (req: any) => {
+    await supabase.from('gym_admin_requests').update({ status: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', req.id);
+    fetchAll();
+  };
+
+  const updateUserRole = async (userId: string, role: string) => {
+    await supabase.from('users').update({ role }).eq('id', userId);
+    fetchAll();
+  };
+
+  const toggleUserPremium = async (userId: string, current: boolean) => {
+    await supabase.from('users').update({
+      is_premium: !current,
+      premium_since: !current ? new Date().toISOString() : null,
+    }).eq('id', userId);
+    fetchAll();
+  };
 
   const toggleGymActive = async (gym: any) => {
     await supabase.from('gyms').update({ is_active: !gym.is_active }).eq('id', gym.id);
@@ -310,12 +352,187 @@ export function AdminFluxFitPage() {
               </div>
             ))}
           </div>
+        ) : activeTab === 'solicitudes' ? (
+          <div className="space-y-4">
+            {/* Filter chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {[
+                { id: 'all', label: 'Todas' },
+                { id: 'pending', label: 'Pendientes' },
+                { id: 'approved', label: 'Aprobadas' },
+                { id: 'rejected', label: 'Rechazadas' },
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setRequestFilter(f.id)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                    requestFilter === f.id ? 'bg-[#CC0000] text-white' : 'bg-white text-[#666] border border-[#E5E5E5]'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {(() => {
+              const filtered = requests.filter(r => requestFilter === 'all' || r.status === requestFilter);
+              if (filtered.length === 0) return (
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                  No hay solicitudes
+                </div>
+              );
+              return filtered.map((req: any) => (
+                <div key={req.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-[#111]">{req.gym_name}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(req.comunas ?? []).map((c: string) => (
+                          <span key={c} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F5F5F5] text-[#666]">{c}</span>
+                        ))}
+                      </div>
+                    </div>
+                    {req.status === 'pending' && <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Pendiente</span>}
+                    {req.status === 'approved' && <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Aprobado</span>}
+                    {req.status === 'rejected' && <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-[#CC0000]">Rechazado</span>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-xs text-[#666]">
+                    <span>{req.users?.email ?? ''}</span>
+                    <span>{req.phone}</span>
+                    <span className="col-span-2">{new Date(req.created_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                  </div>
+                  {req.status === 'pending' && (
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => { setApprovingRequest(req); setApprovalPlan('basico'); }}
+                        className="flex-1 py-2 bg-[#16A34A] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+                      >
+                        Aprobar
+                      </button>
+                      <button
+                        onClick={() => rejectRequest(req)}
+                        className="flex-1 py-2 border-2 border-[#CC0000] text-[#CC0000] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ));
+            })()}
+          </div>
+
+        ) : activeTab === 'usuarios' ? (
+          <div className="space-y-4">
+            <input
+              type="text"
+              value={userSearch}
+              onChange={e => setUserSearch(e.target.value)}
+              placeholder="Buscar por nombre o email..."
+              className="w-full px-4 py-2.5 rounded-xl border border-[#E5E5E5] bg-white text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
+            />
+            {(() => {
+              const q = userSearch.toLowerCase();
+              const filtered = users.filter((u: any) =>
+                !q || u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)
+              );
+              if (filtered.length === 0) return (
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                  No hay usuarios
+                </div>
+              );
+              return filtered.map((u: any) => (
+                <div key={u.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#CC0000] flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-bold text-sm">
+                        {(u.full_name ?? u.email ?? '?')[0].toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-[#111] text-sm">{u.full_name ?? 'Sin nombre'}</p>
+                        {u.role === 'gym_admin' && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">Gym Admin</span>}
+                        {u.role === 'fluxfit_admin' && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-[#CC0000]">FluxFit Admin</span>}
+                      </div>
+                      <p className="text-xs text-[#666] mt-0.5 truncate">{u.email}</p>
+                      <p className="text-xs text-[#999] mt-0.5">{new Date(u.created_at).toLocaleDateString('es-CL')}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-[#666] mb-1 block">Rol</label>
+                      <select
+                        value={u.role ?? 'user'}
+                        onChange={e => updateUserRole(u.id, e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg border border-[#E5E5E5] bg-[#F5F5F5] text-xs text-[#111] focus:outline-none focus:border-[#CC0000]"
+                      >
+                        <option value="user">user</option>
+                        <option value="gym_admin">gym_admin</option>
+                        <option value="fluxfit_admin">fluxfit_admin</option>
+                      </select>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <label className="text-[10px] text-[#666] mb-1 block">Premium</label>
+                      <button
+                        onClick={() => toggleUserPremium(u.id, u.is_premium)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          u.is_premium ? 'bg-[#CC0000]' : 'bg-[#E5E5E5]'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          u.is_premium ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+
         ) : (
           <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
             Próximamente
           </div>
         )}
       </div>
+
+      {/* Approval Modal */}
+      {approvingRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-bold text-[#111] text-base">Aprobar solicitud</h2>
+            <p className="text-sm text-[#444]">Gym: <span className="font-bold">{approvingRequest.gym_name}</span></p>
+            <div>
+              <label className="text-xs text-[#666] mb-1 block">Plan de suscripción</label>
+              <select
+                value={approvalPlan}
+                onChange={e => setApprovalPlan(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-sm text-[#111] focus:outline-none focus:border-[#16A34A]"
+              >
+                <option value="basico">Básico — $59.900/mes</option>
+                <option value="pro">Pro — $89.900/mes</option>
+                <option value="full">Full — $149.900/mes</option>
+              </select>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setApprovingRequest(null)}
+                className="flex-1 py-2.5 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={approveRequest}
+                className="flex-1 py-2.5 bg-[#16A34A] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+              >
+                Confirmar aprobación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Gym Modal */}
       {showGymModal && (
