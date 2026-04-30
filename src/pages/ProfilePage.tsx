@@ -29,6 +29,7 @@ export function ProfilePage() {
   useEffect(() => {
     if (!user || isGuest) return;
     (async () => {
+      await refreshProfile();
       const { data: freshProfile } = await supabase
         .from('users')
         .select('role')
