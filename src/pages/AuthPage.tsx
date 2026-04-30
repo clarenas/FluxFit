@@ -332,7 +332,7 @@ export function AuthPage() {
             e.preventDefault(); setError(''); setSubmitting(true);
             try {
               await signUp(email, password, fullName);
-              setAwaitingConfirmation(true);
+              navigate('/home');
             } catch (err: any) {
               setError(err.message || 'Error al crear cuenta');
             } finally { setSubmitting(false); }
