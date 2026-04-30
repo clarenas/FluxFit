@@ -8,10 +8,11 @@ import { useGyms } from '../hooks/useGyms';
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { user, signOut, isGuest } = useAuth();
+  const { user, signOut, isGuest, refreshProfile } = useAuth();
   const [favIds, setFavIds] = useState<string[]>([]);
   const [isGymAdmin, setIsGymAdmin] = useState(false);
   const [isCommerceAdmin, setIsCommerceAdmin] = useState(false);
+  const [localRole, setLocalRole] = useState<string>('');
   const isPremium = user?.is_premium ?? false;
   const { gyms: allGyms } = useGyms();
 
@@ -27,10 +28,18 @@ export function ProfilePage() {
 
   useEffect(() => {
     if (!user || isGuest) return;
-    supabase.from('gym_admins').select('id').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => setIsGymAdmin(!!data));
-    supabase.from('commerce_admins').select('id').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => setIsCommerceAdmin(!!data));
+    (async () => {
+      const { data: freshProfile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (freshProfile?.role) setLocalRole(freshProfile.role);
+      supabase.from('gym_admins').select('id').eq('user_id', user.id).maybeSingle()
+        .then(({ data }) => setIsGymAdmin(!!data));
+      supabase.from('commerce_admins').select('id').eq('user_id', user.id).maybeSingle()
+        .then(({ data }) => setIsCommerceAdmin(!!data));
+    })();
   }, [user, isGuest]);
 
   const handleSignOut = async () => { await signOut(); navigate('/'); };
@@ -77,7 +86,7 @@ export function ProfilePage() {
         {!isPremium && (
           <button onClick={() => navigate('/premium')} className="w-full bg-[#CC0000] text-white font-bold rounded-xl p-4 text-left active:scale-[0.98] transition-transform"><p className="font-bold text-lg">✦ Hazte Premium</p><p className="text-white/80 text-sm mt-1">Desbloquea descuentos y precios especiales</p></button>
         )}
-        {user?.role === 'fluxfit_admin' && (
+        {(user?.role === 'fluxfit_admin' || localRole === 'fluxfit_admin') && (
           <button onClick={() => navigate('/admin/fluxfit')} className="w-full bg-[#CC0000] text-white font-bold rounded-xl p-4 flex items-center gap-3 active:scale-[0.98] transition-transform">
             <Shield size={18} />
             <div className="text-left">
