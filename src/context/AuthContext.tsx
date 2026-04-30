@@ -87,11 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
+    // El trigger handle_new_user crea el perfil automáticamente
+    // Solo esperamos un momento para que el trigger se ejecute
     if (data.user) {
-      const existing = await fetchProfile(data.user.id);
-      if (!existing) {
-        await supabase.from('users').insert({ id: data.user.id, email, full_name: fullName });
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   };
 

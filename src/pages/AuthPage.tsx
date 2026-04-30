@@ -382,7 +382,8 @@ export function AuthPage() {
               if (signUpError) throw signUpError;
               const userId = signUpData.user?.id;
               if (!userId) throw new Error('No se pudo crear la cuenta');
-              await supabase.from('users').insert({ id: userId, email, full_name: fullName, is_premium: false, avatar_url: '', role: 'gym_pending' });
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await supabase.from('users').update({ full_name: fullName, role: 'gym_pending' }).eq('id', userId);
               const { error: reqError } = await supabase.from('gym_admin_requests').insert({
                 user_id: userId, gym_name: gymName, comunas: gymComunas, phone: gymPhone, plan_interest: 'por_definir', status: 'pending',
               });
@@ -457,7 +458,8 @@ export function AuthPage() {
             if (signUpError) throw signUpError;
             const userId = signUpData.user?.id;
             if (!userId) throw new Error('No se pudo crear la cuenta');
-            await supabase.from('users').insert({ id: userId, email, full_name: fullName, is_premium: false, avatar_url: '', role: 'commerce_admin' });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await supabase.from('users').update({ full_name: fullName }).eq('id', userId);
             const { data: commerceData, error: commerceError } = await supabase
               .from('commerces')
               .insert({ name: commerceName, category: commerceCategory, phone: commercePhone, description: '', is_active: true })
