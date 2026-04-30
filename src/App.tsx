@@ -38,7 +38,7 @@ function AppShell() {
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
       {showNav && <BottomNav />}
-      <div className={showNav ? 'md:ml-[200px]' : ''}>
+      <div className={showNav ? 'md:ml-[200px] md:min-h-screen' : ''}>
         <div className="max-w-[430px] mx-auto md:max-w-[900px]">
           <Routes>
             <Route path="/" element={<SplashPage />} />
