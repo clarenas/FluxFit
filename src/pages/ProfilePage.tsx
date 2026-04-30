@@ -44,7 +44,7 @@ export function ProfilePage() {
             <div className="w-14 h-14 rounded-full bg-[#E5E5E5] flex items-center justify-center text-[#666]"><Eye size={24} /></div>
             <div className="flex-1">
               <h2 className="font-bold text-[#111111]">Modo invitado</h2>
-              <p className="text-sm text-[#666666]">Estas explorando la app sin cuenta</p>
+              <p className="text-sm text-[#666666]">Estás explorando la app sin cuenta</p>
             </div>
           </div>
           <div className="bg-[#CC0000]/10 border border-[#CC0000]/30 rounded-xl p-4">

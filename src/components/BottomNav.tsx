@@ -14,7 +14,7 @@ export function BottomNav() {
   const isActive = (path: string) => location.pathname.startsWith(path);
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full max-w-[430px] left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 md:top-0 md:bottom-auto md:w-[200px] md:h-screen md:max-w-none md:flex-col md:justify-start md:pt-8 md:border-r md:border-[#E5E5E5] md:border-t-0 bg-white border-t border-[#E5E5E5] flex items-center justify-around z-40">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:left-0 md:translate-x-0 md:top-0 md:bottom-auto md:w-[200px] md:h-screen md:max-w-none md:flex-col md:justify-start md:pt-8 md:border-r md:border-[#E5E5E5] md:border-t-0 bg-white border-t border-[#E5E5E5] flex items-center justify-around z-40">
       <div className="flex justify-around items-center h-16 px-2 w-full md:flex-col md:h-full md:justify-start md:items-stretch md:px-0 md:gap-1">
         {tabs.map(({ path, label, Icon }) => {
           const active = isActive(path);
