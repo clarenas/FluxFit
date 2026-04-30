@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { OccupancyGauge } from '../components/OccupancyGauge';
@@ -17,6 +18,7 @@ const COMUNAS = ['Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'La Reina',
 const inp = 'w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]';
 
 export function GymAdminPage({ initialTab }: Props) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [gym, setGym] = useState<Gym | null>(null);
   const [plans, setPlans] = useState<GymPlan[]>([]);
@@ -40,8 +42,6 @@ export function GymAdminPage({ initialTab }: Props) {
   const [serviceForm, setServiceForm] = useState({ name: '', description: '', regular_price: '', premium_price: '', category: 'entrenamiento' as string });
   const [discountForm, setDiscountForm] = useState({ description: '', regular_value: '', premium_value: '', discount_percentage: '' });
   const [hourForm, setHourForm] = useState({ day_of_week: '1', hour_start: '06:00', hour_end: '08:00', label: '' });
-  const [requestingPlan, setRequestingPlan] = useState<string | null>(null);
-  const [planRequestSent, setPlanRequestSent] = useState<string | null>(null);
   const [editingInfo, setEditingInfo] = useState(false);
   const [infoForm, setInfoForm] = useState({ name: '', address: '', comuna: '', phone: '', website: '', description: '' });
 
@@ -171,20 +171,6 @@ export function GymAdminPage({ initialTab }: Props) {
     setEditingInfo(false);
   };
 
-  const requestPlan = async (planName: string, planPrice: string) => {
-    if (!gym || !user) return;
-    setRequestingPlan(planName);
-    try {
-      await supabase.from('contact_messages').insert({
-        user_id: user.id, name: gym.name, email: user.email, type: 'Solicitud de plan',
-        message: `El gym "${gym.name}" solicita contratar el plan ${planName} (${planPrice}/mes). Contactar a: ${user.email}`,
-      });
-      setPlanRequestSent(planName);
-    } finally {
-      setRequestingPlan(null);
-    }
-  };
-
   const validateQr = async () => {
     if (!gym || !qrInput.trim()) return;
     setValidatingQr(true);
@@ -267,7 +253,7 @@ export function GymAdminPage({ initialTab }: Props) {
           <div className="bg-[#FFFBEB] border border-[#FCD34D] rounded-xl p-4">
             <p className="text-[#92400E] font-bold text-sm">Plan gratuito — acceso limitado</p>
             <p className="text-[#92400E] text-xs mt-1">Contrata un plan para gestionar tu gym completo.</p>
-            <button onClick={() => setActiveTab('mi_plan')} className="mt-2 text-xs font-bold text-[#CC0000] underline">Ver planes →</button>
+            <button onClick={() => navigate('/premium')} className="mt-2 text-xs font-bold text-[#CC0000] underline">Ver planes →</button>
           </div>
         )}
 
@@ -459,48 +445,7 @@ export function GymAdminPage({ initialTab }: Props) {
             </div>
           )}
 
-          {activeTab === 'mi_plan' && (() => {
-            const planBadge = () => {
-              if (plan === 'light') return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Plan Light</span>;
-              if (plan === 'basico') return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Plan Básico</span>;
-              if (plan === 'pro') return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Plan Pro</span>;
-              if (plan === 'full') return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#111111] text-white">Plan Full</span>;
-              return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#E5E5E5] text-[#666]">Plan Gratuito</span>;
-            };
-            const PlanCard = ({ planKey, name, price, features, popular }: { planKey: string; name: string; price: string; features: string[]; popular?: boolean }) => {
-              const isCurrent = plan === planKey;
-              const isSuperior = (['light','basico','pro','full'].indexOf(plan) > ['light','basico','pro','full'].indexOf(planKey));
-              const sent = planRequestSent === name;
-              return (
-                <div className={`bg-white rounded-xl border-2 p-5 space-y-3 ${popular ? 'border-[#CC0000]' : 'border-[#E5E5E5]'}`}>
-                  {popular && <div className="inline-block bg-[#111111] text-white text-xs font-bold px-2 py-0.5 rounded-full">Más popular</div>}
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold text-[#111111] text-base">{name}</p>
-                    {isCurrent && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Plan actual</span>}
-                    {isSuperior && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#F5F5F5] text-[#666]">Plan inferior</span>}
-                  </div>
-                  <p className="text-[#CC0000] font-bold text-lg">{formatCLP(parseInt(price))}<span className="text-[#666] text-sm font-normal">/mes</span></p>
-                  <ul className="space-y-1.5">{features.map(f => <li key={f} className="text-xs text-[#444] flex items-start gap-1.5"><span className="text-[#16A34A] font-bold mt-0.5">✓</span>{f}</li>)}</ul>
-                  {!isCurrent && !isSuperior && (
-                    sent
-                      ? <p className="text-xs text-[#16A34A] font-bold bg-green-50 rounded-lg p-3">✓ Solicitud enviada. Te contactaremos a {user?.email}.</p>
-                      : <button onClick={() => requestPlan(name, formatCLP(parseInt(price)))} disabled={requestingPlan === name} className="w-full py-2.5 bg-[#CC0000] text-white font-bold rounded-xl text-sm active:scale-[0.98] transition-transform disabled:opacity-50">
-                          {requestingPlan === name ? 'Enviando...' : `Solicitar plan ${name}`}
-                        </button>
-                  )}
-                </div>
-              );
-            };
-            return (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between"><h2 className="font-bold text-[#111111]">Mi Plan</h2>{planBadge()}</div>
-                <PlanCard planKey="free" name="Free" price="0" features={['1 sucursal', 'Sensor de ocupación', 'Perfil básico']} />
-                <PlanCard planKey="light" name="Light" price="89900" features={['Hasta 3 sucursales', 'Editar ficha técnica', 'Planes rebajados para Premium', 'Validación QR']} />
-                <PlanCard planKey="pro" name="Pro" price="149900" popular features={['Hasta 8 sucursales', 'Todo lo del Light', 'Métricas avanzadas', 'Promociones especiales', 'Badge Verificado']} />
-                <p className="text-xs text-[#666] text-center">¿Dudas? Escríbenos a cvlarenas@gmail.com</p>
-              </div>
-            );
-          })()}
+          {activeTab === 'mi_plan' && null /* handled by /premium — see PremiumPage */}
 
           {activeTab === 'sensor' && (
             <div className="space-y-4">

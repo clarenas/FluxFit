@@ -51,9 +51,17 @@ export function AuthPage() {
   const [commerceCategory, setCommerceCategory] = useState('nutricion');
   const [commercePhone, setCommercePhone] = useState('');
 
+  // Redirect to role-appropriate home immediately after login — no flash
+  const roleHome = (role: string | undefined) => {
+    if (role === 'fluxfit_admin') return '/admin/fluxfit';
+    if (role === 'gym_admin') return '/admin/gym';
+    if (role === 'commerce_admin') return '/admin/commerce';
+    return '/home';
+  };
+
   useEffect(() => {
     if (!loading && user && !isReset) {
-      navigate('/home', { replace: true });
+      navigate(roleHome(user.role), { replace: true });
     }
   }, [user, loading, navigate, isReset]);
 
