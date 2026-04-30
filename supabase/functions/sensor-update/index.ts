@@ -12,6 +12,17 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const authToken = Deno.env.get("SENSOR_AUTH_TOKEN");
+    if (authToken) {
+      const provided = req.headers.get("X-Sensor-Auth");
+      if (provided !== authToken) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const { gym_id, sensor_key, people_count } = await req.json();
 
     if (!gym_id || !sensor_key || people_count === undefined) {

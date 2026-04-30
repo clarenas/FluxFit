@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { getDayLabel, getOccupancyColor } from '../lib/utils';
 import type { WeeklyOccupancySummary } from '../lib/types';
 
@@ -7,11 +8,16 @@ export function OccupancyHeatmap({ data }: Props) {
   const days = [1, 2, 3, 4, 5, 6, 0];
   const hours = Array.from({ length: 17 }, (_, i) => i + 6);
 
-  const getCellColor = (day: number, hour: number): string => {
-    const entry = data.find(d => d.day_of_week === day && d.hour_of_day === hour);
-    if (!entry) return '#E5E5E5';
-    return getOccupancyColor(entry.avg_status);
-  };
+  const colorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of data) {
+      map.set(`${entry.day_of_week}-${entry.hour_of_day}`, getOccupancyColor(entry.avg_status));
+    }
+    return map;
+  }, [data]);
+
+  const getCellColor = (day: number, hour: number): string =>
+    colorMap.get(`${day}-${hour}`) ?? '#E5E5E5';
 
   return (
     <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">

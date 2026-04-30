@@ -22,6 +22,7 @@ export function HomePage() {
   const { user, isGuest } = useAuth();
   const { gyms, loading: loadingGyms, error: gymsError } = useGyms();
   const [commerces, setCommerces] = useState<Commerce[]>([]);
+  const [commercesError, setCommercesError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
@@ -32,8 +33,8 @@ export function HomePage() {
 
   const fetchCommerces = useCallback(async () => {
     const { data, error } = await supabase.from('commerces').select('*').eq('is_active', true);
-    if (error) { console.error('No se pudo cargar los descuentos.'); }
-    if (data) setCommerces(data);
+    if (error) { setCommercesError('No se pudieron cargar los descuentos.'); return; }
+    setCommerces(data ?? []);
   }, []);
 
   const fetchFavorites = useCallback(async () => {
@@ -96,6 +97,7 @@ export function HomePage() {
 
         <div>
           <h2 className="text-[#111111] font-bold text-base mb-3">Descuentos FluxFit</h2>
+          {commercesError && <p className="text-[#CC0000] text-sm py-2">{commercesError}</p>}
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide md:grid md:grid-cols-4 md:overflow-x-visible md:mx-0 md:px-0">
             {commerces.map(c => (
               <button key={c.id} onClick={() => setSelectedCommerce(c)} className="flex-shrink-0 md:flex-shrink w-36 md:w-full bg-white rounded-xl shadow-sm border border-[#E5E5E5] p-3 text-left active:scale-[0.97] transition-transform">
