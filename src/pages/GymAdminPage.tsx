@@ -23,7 +23,9 @@ export function GymAdminPage() {
   const [heatmapData, setHeatmapData] = useState<WeeklyOccupancySummary[]>([]);
   const [todayLogs, setTodayLogs] = useState<OccupancyLog[]>([]);
   const [sensorLogs, setSensorLogs] = useState<OccupancyLog[]>([]);
-  const [activeTab, setActiveTab] = useState<AdminTab>('sucursales');
+  const [activeTab, setActiveTab] = useState<AdminTab>('sensor');
+  const [subscription, setSubscription] = useState<{ plan: string } | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [maxCapacityEdit, setMaxCapacityEdit] = useState('');
   const [editingMaxCapacity, setEditingMaxCapacity] = useState(false);
@@ -38,6 +40,9 @@ export function GymAdminPage() {
     const { data: adminData } = await supabase.from('gym_admins').select('gym_id').eq('user_id', user.id).maybeSingle();
     if (!adminData) return;
     const gymId = adminData.gym_id;
+    const { data: subData } = await supabase.from('gym_subscriptions').select('plan').eq('gym_id', gymId).maybeSingle();
+    setSubscription(subData);
+    setLoadingPlan(false);
     const [gymRes, plansRes, servicesRes, discountsRes, hoursRes, heatmapRes, logsRes, branchesRes, promoRes] = await Promise.all([
       supabase.from('gyms').select('*').eq('id', gymId).maybeSingle(),
       supabase.from('gym_plans').select('*').eq('gym_id', gymId),
@@ -125,17 +130,36 @@ export function GymAdminPage() {
 
   if (!gym) return <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center text-[#666]">Cargando panel de administración...</div>;
 
-  const tabs: { key: AdminTab; label: string }[] = [
-    { key: 'sucursales', label: 'Sucursales' }, { key: 'planes', label: 'Planes' },
-    { key: 'servicios', label: 'Servicios' }, { key: 'promociones', label: 'Promociones' },
-    { key: 'descuentos', label: 'Descuentos' }, { key: 'horarios', label: 'Horarios' },
-    { key: 'sensor', label: 'Sensor' },
+  const plan = subscription?.plan ?? 'free';
+  const canManagePlans = ['basico', 'pro', 'full'].includes(plan);
+  const canManageServices = ['basico', 'pro', 'full'].includes(plan);
+  const canManageDiscounts = ['basico', 'pro', 'full'].includes(plan);
+  const canManageHours = ['basico', 'pro', 'full'].includes(plan);
+  const canManageBranches = ['basico', 'pro', 'full'].includes(plan);
+  const canSeePromotions = ['pro', 'full'].includes(plan);
+
+  const allTabs: { key: AdminTab; label: string; allowed: boolean }[] = [
+    { key: 'sucursales', label: 'Sucursales', allowed: canManageBranches },
+    { key: 'planes', label: 'Planes', allowed: canManagePlans },
+    { key: 'servicios', label: 'Servicios', allowed: canManageServices },
+    { key: 'promociones', label: 'Promociones', allowed: canSeePromotions },
+    { key: 'descuentos', label: 'Descuentos', allowed: canManageDiscounts },
+    { key: 'horarios', label: 'Horarios', allowed: canManageHours },
+    { key: 'sensor', label: 'Sensor', allowed: true },
   ];
+  const tabs = allTabs.filter(t => t.allowed);
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-8">
       <div className="bg-[#111111] px-4 pt-8 pb-4"><p className="text-white/60 text-xs">FluxFit Admin</p><h1 className="text-white font-bold text-lg">{gym.name}</h1></div>
       <div className="px-4 pt-4 space-y-4">
+        {!loadingPlan && plan === 'free' && (
+          <div className="bg-[#FFFBEB] border border-[#FCD34D] rounded-xl p-4">
+            <p className="text-[#92400E] font-bold text-sm">Plan gratuito — acceso limitado</p>
+            <p className="text-[#92400E] text-xs mt-1">Con el plan gratuito solo puedes ver la ocupación en tiempo real. Contrata un plan para gestionar tu gym completo.</p>
+            <button onClick={() => setActiveTab('planes' as AdminTab)} className="mt-2 text-xs font-bold text-[#CC0000] underline">Ver planes disponibles →</button>
+          </div>
+        )}
         <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
           <div className="flex items-center gap-2 mb-2">
             {gym.sensor_online ? <><span className="w-3 h-3 rounded-full bg-[#16A34A] animate-pulse" /><span className="text-[#16A34A] font-bold text-sm">Sensor activo</span></> : <><span className="w-3 h-3 rounded-full bg-[#CC0000]" /><span className="text-[#CC0000] font-bold text-sm">Sensor sin conexión</span></>}
