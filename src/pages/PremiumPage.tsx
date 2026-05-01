@@ -231,7 +231,7 @@ export function PremiumPage() {
           {[
             { label: 'Suscripciones de Gyms', value: adminRevenue?.gymRevenue ?? 0, desc: 'Planes Light y Pro activos' },
             { label: 'Suscripciones de Comercios', value: adminRevenue?.commerceRevenue ?? 0, desc: 'Planes Basic y Premium activos' },
-            { label: 'Membresías Premium de Atletas', value: (adminRevenue?.premiumUsers ?? 0) * 2990, desc: `${adminRevenue?.premiumUsers ?? 0} usuarios × $2.990/mes` },
+            { label: 'Membresías Premium de Usuarios', value: (adminRevenue?.premiumUsers ?? 0) * 2990, desc: `${adminRevenue?.premiumUsers ?? 0} usuarios × $2.990/mes` },
           ].map(item => (
             <div key={item.label} className="bg-white rounded-xl border border-[#E5E5E5] p-4 flex items-center justify-between">
               <div>
@@ -322,7 +322,7 @@ export function PremiumPage() {
         <div className="px-4 pt-4 space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <p className="text-sm text-blue-800 font-bold">Planes para tu Comercio</p>
-            <p className="text-xs text-blue-700 mt-1">Llega a miles de atletas con beneficios exclusivos.</p>
+            <p className="text-xs text-blue-700 mt-1">Llega a miles de usuarios con beneficios exclusivos.</p>
           </div>
           {COMMERCE_PLANS.map(p => (
             <PlanCard
@@ -343,7 +343,7 @@ export function PremiumPage() {
     );
   }
 
-  // ── User (Atleta): B2C premium ─────────────────────────────────────────────
+  // ── User: B2C premium ─────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-20">
       <Toast {...toast} />

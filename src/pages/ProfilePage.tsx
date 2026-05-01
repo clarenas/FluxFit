@@ -10,7 +10,7 @@ const ROLE_LABELS: Record<string, string> = {
   fluxfit_admin:  'Administrador FluxFit',
   gym_admin:      'Administrador de Gym',
   commerce_admin: 'Administrador de Comercio',
-  user:           'Atleta',
+  user:           'Usuario',
 };
 
 export function ProfilePage() {
@@ -120,7 +120,7 @@ export function ProfilePage() {
     );
   }
 
-  // ── User (Atleta): full profile with favorites and premium ─────────────────
+  // ── User: full profile with favorites and premium ─────────────────────────
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-20">
       <div className="bg-white border-b border-[#E5E5E5] px-4 py-3">

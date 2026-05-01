@@ -9,6 +9,8 @@ import { GymPromotionsTab } from '../components/admin/GymPromotionsTab';
 import { formatCLP, getServiceCategoryLabel, getFullDayLabel, timeAgo } from '../lib/utils';
 import type { Gym, GymPlan, GymService, GymDiscount, GymRecommendedHour, WeeklyOccupancySummary, OccupancyLog, GymBranch, GymPromotion, CouponRedemption } from '../lib/types';
 import { Plus, Trash2, Copy, RefreshCw, AlertTriangle, QrCode, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useToast } from '../hooks/useToast';
+import { Toast } from '../components/Toast';
 
 type AdminTab = 'sucursales' | 'planes' | 'servicios' | 'promociones' | 'descuentos' | 'horarios' | 'sensor' | 'mi_plan' | 'validar_qr';
 
@@ -20,6 +22,7 @@ const inp = 'w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:o
 export function GymAdminPage({ initialTab }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast, showToast } = useToast();
   const [gym, setGym] = useState<Gym | null>(null);
   const [plans, setPlans] = useState<GymPlan[]>([]);
   const [services, setServices] = useState<GymService[]>([]);
@@ -159,16 +162,20 @@ export function GymAdminPage({ initialTab }: Props) {
 
   const saveGymInfo = async () => {
     if (!gym) return;
-    // Save with pending approval — hide from users until FluxFit approves
-    await supabase.from('gyms').update({
+    const { error } = await supabase.from('gyms').update({
       name: infoForm.name, address: infoForm.address, comuna: infoForm.comuna,
       phone: infoForm.phone, website: infoForm.website, description: infoForm.description,
       approval_status: 'pending',
       is_active: false,
     }).eq('id', gym.id);
+    if (error) {
+      showToast('Error al guardar cambios. Intenta de nuevo.', 'error');
+      return;
+    }
     setGym(prev => prev ? { ...prev, ...infoForm, approval_status: 'pending', is_active: false } : prev);
     setIsPending(true);
     setEditingInfo(false);
+    showToast('Cambios enviados para revisión por FluxFit', 'success');
   };
 
   const validateQr = async () => {
@@ -238,6 +245,7 @@ export function GymAdminPage({ initialTab }: Props) {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-24">
+      <Toast {...toast} />
       <div className="bg-[#111111] px-4 pt-8 pb-4">
         <p className="text-white/60 text-xs">FluxFit Admin</p>
         <h1 className="text-white font-bold text-lg">{gym.name}</h1>

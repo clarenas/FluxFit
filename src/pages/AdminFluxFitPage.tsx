@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Plus, X, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Shield, Plus, X, CheckCircle, XCircle, Cpu, Wifi, WifiOff, Wrench, Unlink, Link } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatCLP } from '../lib/utils';
+import { useToast } from '../hooks/useToast';
+import { Toast } from '../components/Toast';
 
 const COMUNAS = ['Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'La Reina', 'Peñalolén'];
 const PLAN_PRICES: Record<string, number> = { basico: 59900, pro: 89900, full: 149900 };
@@ -62,15 +64,27 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [messageFilter, setMessageFilter] = useState('todos');
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
 
+  // Sensor inventory state
+  const [sensors, setSensors] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [sensorForm, setSensorForm] = useState({ label: '', branch_id: '' });
+  const [showSensorForm, setShowSensorForm] = useState(false);
+  const [savingSensor, setSavingSensor] = useState(false);
+  const [linkingBranch, setLinkingBranch] = useState<string | null>(null);
+
+  const { toast, showToast } = useToast();
+
   const fetchAll = async () => {
     setLoading(true);
-    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes] = await Promise.all([
+    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes, sensorsRes, branchesRes] = await Promise.all([
       supabase.from('gyms').select('*, gym_subscriptions(plan,plan_price,status,valid_until), gym_branches(id), gym_admins(id)').order('name'),
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('contact_messages').select('*').order('created_at', { ascending: false }),
       supabase.from('gym_admin_requests').select('*, users(email,full_name)').order('created_at', { ascending: false }),
       supabase.from('commerces').select('*, commerce_subscriptions(plan,status,valid_until)').order('name'),
       supabase.from('coupon_redemptions').select('*').order('redeemed_at', { ascending: false }),
+      supabase.from('sensors').select('*, gym_branches(name, gyms(name))').order('created_at', { ascending: false }),
+      supabase.from('gym_branches').select('id, name, gym_id, gyms(name)').order('name'),
     ]);
 
     const mappedGyms = (gymsRes.data ?? []).map((g: any) => {
@@ -92,6 +106,8 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     setRequests(requestsRes.data ?? []);
     setCommerces(commercesRes.data ?? []);
     setRedemptions(redemptionsRes.data ?? []);
+    setSensors(sensorsRes.data ?? []);
+    setBranches(branchesRes.data ?? []);
     setPendingGyms(mappedGyms.filter((g: any) => g.approval_status === 'pending'));
     setPendingCommerces((commercesRes.data ?? []).filter((c: any) => c.approval_status === 'pending'));
     setLoading(false);
@@ -283,9 +299,57 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
       setShowGymModal(false);
       await fetchAll();
+      showToast(editingGym ? 'Gym actualizado correctamente' : 'Gym creado correctamente', 'success');
+    } catch (err: any) {
+      showToast('Error al guardar: ' + (err?.message ?? 'intenta de nuevo'), 'error');
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── Sensor CRUD ──────────────────────────────────────────────────────────
+
+  const createSensor = async () => {
+    if (!sensorForm.label.trim()) return;
+    setSavingSensor(true);
+    try {
+      const { error } = await supabase.from('sensors').insert({
+        label: sensorForm.label.trim(),
+        branch_id: sensorForm.branch_id || null,
+        status: 'offline',
+      });
+      if (error) throw error;
+      setSensorForm({ label: '', branch_id: '' });
+      setShowSensorForm(false);
+      await fetchAll();
+      showToast('Sensor registrado correctamente', 'success');
+    } catch (err: any) {
+      showToast('Error al crear sensor: ' + (err?.message ?? ''), 'error');
+    } finally {
+      setSavingSensor(false);
+    }
+  };
+
+  const linkSensor = async (sensorId: string, branchId: string | null) => {
+    setLinkingBranch(sensorId);
+    try {
+      const { error } = await supabase.from('sensors').update({ branch_id: branchId }).eq('id', sensorId);
+      if (error) throw error;
+      await fetchAll();
+      showToast(branchId ? 'Sensor vinculado a sucursal' : 'Sensor desvinculado', 'success');
+    } catch (err: any) {
+      showToast('Error al vincular: ' + (err?.message ?? ''), 'error');
+    } finally {
+      setLinkingBranch(null);
+    }
+  };
+
+  const deleteSensor = async (id: string) => {
+    if (!confirm('¿Eliminar este sensor del inventario?')) return;
+    const { error } = await supabase.from('sensors').delete().eq('id', id);
+    if (error) { showToast('Error al eliminar', 'error'); return; }
+    await fetchAll();
+    showToast('Sensor eliminado', 'success');
   };
 
   // Metrics
@@ -309,6 +373,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     { id: 'gyms', label: 'Gyms' },
     { id: 'solicitudes', label: 'Solicitudes' },
     { id: 'pendientes', label: pendingCount > 0 ? `Pendientes (${pendingCount})` : 'Pendientes' },
+    { id: 'inventario', label: `Inventario (${sensors.length})` },
     { id: 'impacto', label: 'Impacto' },
     { id: 'usuarios', label: 'Usuarios' },
     { id: 'mensajes', label: 'Mensajes' },
@@ -322,6 +387,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
+      <Toast {...toast} />
       {/* Header */}
       <div className="bg-white border-b border-[#E5E5E5] px-4 py-3 flex items-center gap-3">
         <button onClick={() => navigate('/profile')} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F5F5F5] transition-colors">
@@ -751,6 +817,176 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+        ) : activeTab === 'inventario' ? (
+          /* ── Sensor Inventory ────────────────────────────────────────── */
+          <div className="space-y-4 pb-8">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Cpu size={18} className="text-[#CC0000]" />
+                <h2 className="font-bold text-[#111]">Inventario de Sensores</h2>
+              </div>
+              <button
+                onClick={() => { setShowSensorForm(v => !v); setSensorForm({ label: '', branch_id: '' }); }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+              >
+                <Plus size={14} /> Registrar sensor
+              </button>
+            </div>
+
+            {/* New sensor form */}
+            {showSensorForm && (
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3">
+                <p className="font-bold text-[#111] text-sm">Nuevo sensor</p>
+                <div className="space-y-2">
+                  <input
+                    value={sensorForm.label}
+                    onChange={e => setSensorForm(f => ({ ...f, label: e.target.value }))}
+                    placeholder="Nombre / etiqueta (ej: Sensor Entrada Norte)"
+                    className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]"
+                  />
+                  <select
+                    value={sensorForm.branch_id}
+                    onChange={e => setSensorForm(f => ({ ...f, branch_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000] bg-white"
+                  >
+                    <option value="">— Sin sucursal (inventario) —</option>
+                    {branches.map((b: any) => (
+                      <option key={b.id} value={b.id}>
+                        {(b.gyms as any)?.name ?? 'Gym'} · {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={createSensor}
+                    disabled={savingSensor || !sensorForm.label.trim()}
+                    className="flex-1 py-2 bg-[#CC0000] text-white text-sm font-bold rounded-xl disabled:opacity-50 active:scale-[0.98] transition-transform"
+                  >
+                    {savingSensor ? 'Guardando...' : 'Registrar'}
+                  </button>
+                  <button
+                    onClick={() => setShowSensorForm(false)}
+                    className="flex-1 py-2 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Stats strip */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Online', count: sensors.filter(s => s.status === 'online').length, color: 'text-[#16A34A]' },
+                { label: 'Offline', count: sensors.filter(s => s.status === 'offline').length, color: 'text-[#CC0000]' },
+                { label: 'Mantenimiento', count: sensors.filter(s => s.status === 'maintenance').length, color: 'text-amber-500' },
+              ].map(s => (
+                <div key={s.label} className="bg-white rounded-xl border border-[#E5E5E5] p-3 text-center">
+                  <p className={`text-xl font-bold ${s.color}`}>{s.count}</p>
+                  <p className="text-[10px] text-[#666] mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Sensor list */}
+            {sensors.length === 0 ? (
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                No hay sensores registrados. Registra el primero con el botón de arriba.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sensors.map((s: any) => {
+                  const StatusIcon = s.status === 'online' ? Wifi : s.status === 'maintenance' ? Wrench : WifiOff;
+                  const statusColor = s.status === 'online' ? 'text-[#16A34A] bg-[#16A34A]/10' : s.status === 'maintenance' ? 'text-amber-600 bg-amber-50' : 'text-[#CC0000] bg-[#CC0000]/10';
+                  const statusLabel = s.status === 'online' ? 'Online' : s.status === 'maintenance' ? 'Mantenimiento' : 'Offline';
+                  const branch = s.gym_branches as any;
+                  const gymName = branch?.gyms?.name ?? null;
+                  const lastSeen = s.last_heartbeat
+                    ? new Date(s.last_heartbeat).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                    : 'Nunca';
+                  const isLinking = linkingBranch === s.id;
+
+                  return (
+                    <div key={s.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3">
+                      {/* Top row */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Cpu size={14} className="text-[#666] flex-shrink-0" />
+                            <p className="font-bold text-[#111] text-sm truncate">{s.label || 'Sin etiqueta'}</p>
+                          </div>
+                          {gymName ? (
+                            <p className="text-xs text-[#666] mt-0.5 ml-[22px]">{gymName} · {branch?.name}</p>
+                          ) : (
+                            <p className="text-xs text-[#999] mt-0.5 ml-[22px]">Sin sucursal asignada</p>
+                          )}
+                        </div>
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${statusColor}`}>
+                          <StatusIcon size={10} />
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      {/* Metadata row */}
+                      <div className="flex items-center gap-4 text-[10px] text-[#999] font-mono">
+                        <span>Batería: {s.battery_level}%</span>
+                        <span>Último ping: {lastSeen}</span>
+                      </div>
+
+                      {/* Secret key */}
+                      <div className="bg-[#F5F5F5] rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                        <code className="text-[10px] text-[#666] font-mono truncate">{s.secret_key}</code>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(s.secret_key).then(() => showToast('Clave copiada', 'success'))}
+                          className="text-[10px] text-[#CC0000] font-bold flex-shrink-0"
+                        >
+                          Copiar
+                        </button>
+                      </div>
+
+                      {/* Link/unlink controls */}
+                      <div className="flex gap-2 pt-1">
+                        <select
+                          defaultValue={s.branch_id ?? ''}
+                          onChange={e => linkSensor(s.id, e.target.value || null)}
+                          disabled={isLinking}
+                          className="flex-1 px-2 py-1.5 border border-[#E5E5E5] rounded-lg text-xs focus:outline-none focus:border-[#CC0000] bg-white disabled:opacity-50"
+                        >
+                          <option value="">— Inventario (sin sucursal) —</option>
+                          {branches.map((b: any) => (
+                            <option key={b.id} value={b.id}>
+                              {(b.gyms as any)?.name ?? 'Gym'} · {b.name}
+                            </option>
+                          ))}
+                        </select>
+                        {s.branch_id && (
+                          <button
+                            onClick={() => linkSensor(s.id, null)}
+                            disabled={isLinking}
+                            title="Desvincular sucursal"
+                            className="p-1.5 border border-[#E5E5E5] rounded-lg text-[#CC0000] hover:bg-[#CC0000]/5 disabled:opacity-50 transition-colors"
+                          >
+                            <Unlink size={14} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteSensor(s.id)}
+                          className="p-1.5 border border-[#E5E5E5] rounded-lg text-[#666] hover:border-[#CC0000] hover:text-[#CC0000] transition-colors"
+                          title="Eliminar sensor"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {isLinking && <p className="text-[10px] text-[#666] text-center">Actualizando vinculación...</p>}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
