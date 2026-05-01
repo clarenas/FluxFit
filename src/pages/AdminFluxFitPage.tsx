@@ -61,6 +61,8 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [approvingRequest, setApprovingRequest] = useState<any>(null);
   const [approvalPlan, setApprovalPlan] = useState('basico');
   const [userSearch, setUserSearch] = useState('');
+  const [userFilter, setUserFilter] = useState('todos');
+  const [selectedUserHistory, setSelectedUserHistory] = useState<string | null>(null);
   const [requestFilter, setRequestFilter] = useState('all');
   const [messageFilter, setMessageFilter] = useState('todos');
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
@@ -320,7 +322,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     { id: 'solicitudes', label: 'Solicitudes' },
     { id: 'pendientes', label: pendingCount > 0 ? `Pendientes (${pendingCount})` : 'Pendientes' },
     { id: 'impacto', label: 'Impacto' },
-    { id: 'usuarios', label: 'Usuarios' },
+    { id: 'socios', label: 'Socios' },
     { id: 'mensajes', label: 'Mensajes' },
     { id: 'comercios', label: 'Comercios' },
   ];
@@ -703,72 +705,229 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             })()}
           </div>
 
-        ) : activeTab === 'usuarios' ? (
+        ) : activeTab === 'socios' ? (
           <div className="space-y-4">
+            {/* Search */}
             <input
               type="text"
               value={userSearch}
               onChange={e => setUserSearch(e.target.value)}
-              placeholder="Buscar por nombre o email..."
+              placeholder="Buscar por nombre, RUT o email..."
               className="w-full px-4 py-2.5 rounded-xl border border-[#E5E5E5] bg-white text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
             />
+
+            {/* Filter chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {[
+                { id: 'todos', label: 'Todos' },
+                { id: 'activos', label: 'Activos' },
+                { id: 'inactivos', label: 'Inactivos' },
+                { id: 'por_vencer', label: 'Por vencer' },
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setUserFilter(f.id)}
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                    userFilter === f.id ? 'bg-[#CC0000] text-white' : 'bg-white text-[#666] border border-[#E5E5E5]'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
             {(() => {
+              const now = Date.now();
+
+              const getUserStatus = (u: any): 'activo' | 'por_vencer' | 'vencido' | 'inactivo' => {
+                if (!u.is_active) return 'inactivo';
+                if (u.is_premium && u.plan_valid_until) {
+                  const diff = (new Date(u.plan_valid_until).getTime() - now) / 86400000;
+                  if (diff < 0) return 'vencido';
+                  if (diff <= 7) return 'por_vencer';
+                }
+                return 'activo';
+              };
+
               const q = userSearch.toLowerCase();
-              const filtered = users.filter((u: any) =>
-                !q || u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)
-              );
-              if (filtered.length === 0) return (
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
-                  No hay usuarios
-                </div>
-              );
-              return filtered.map((u: any) => (
-                <div key={u.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#CC0000] flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-bold text-sm">
-                        {(u.full_name ?? u.email ?? '?')[0].toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-bold text-[#111] text-sm">{u.full_name ?? 'Sin nombre'}</p>
-                        {u.role === 'gym_admin' && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">Gym Admin</span>}
-                        {u.role === 'fluxfit_admin' && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-[#CC0000]">FluxFit Admin</span>}
+              let filtered = users.filter((u: any) => {
+                if (q) {
+                  const matchName = u.full_name?.toLowerCase().includes(q);
+                  const matchEmail = u.email?.toLowerCase().includes(q);
+                  const matchRut = u.rut?.toLowerCase().includes(q);
+                  if (!matchName && !matchEmail && !matchRut) return false;
+                }
+                if (userFilter === 'activos') return u.is_active === true;
+                if (userFilter === 'inactivos') return u.is_active === false;
+                if (userFilter === 'por_vencer') {
+                  if (!u.is_premium || !u.plan_valid_until) return false;
+                  const diff = (new Date(u.plan_valid_until).getTime() - now) / 86400000;
+                  return diff >= 0 && diff <= 7;
+                }
+                return true;
+              });
+
+              // Stats
+              const totalCount = users.length;
+              const activeCount = users.filter((u: any) => u.is_active).length;
+              const premiumCount = users.filter((u: any) => u.is_premium).length;
+              const expiringCount = users.filter((u: any) => {
+                if (!u.is_premium || !u.plan_valid_until) return false;
+                const diff = (new Date(u.plan_valid_until).getTime() - now) / 86400000;
+                return diff >= 0 && diff <= 7;
+              }).length;
+
+              const statusConfig = {
+                activo: { dot: 'bg-[#16A34A]', text: 'text-[#16A34A]', badge: 'bg-[#16A34A]/10 text-[#16A34A]', label: 'ACTIVO' },
+                por_vencer: { dot: 'bg-amber-400', text: 'text-amber-500', badge: 'bg-amber-100 text-amber-700', label: 'POR VENCER' },
+                vencido: { dot: 'bg-[#CC0000]', text: 'text-[#CC0000]', badge: 'bg-[#CC0000]/10 text-[#CC0000]', label: 'VENCIDO' },
+                inactivo: { dot: 'bg-[#999]', text: 'text-[#666]', badge: 'bg-[#F5F5F5] text-[#666]', label: 'INACTIVO' },
+              };
+
+              return (
+                <>
+                  {/* Stats grid */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: 'Total', value: totalCount, color: 'text-[#111]' },
+                      { label: 'Activos', value: activeCount, color: 'text-[#16A34A]' },
+                      { label: 'Premium', value: premiumCount, color: 'text-[#CC0000]' },
+                      { label: 'Por vencer', value: expiringCount, color: 'text-amber-500' },
+                    ].map(s => (
+                      <div key={s.label} className="bg-white rounded-xl border border-[#E5E5E5] p-3 text-center">
+                        <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                        <p className="text-[10px] text-[#666] mt-0.5 leading-tight">{s.label}</p>
                       </div>
-                      <p className="text-xs text-[#666] mt-0.5 truncate">{u.email}</p>
-                      <p className="text-xs text-[#999] mt-0.5">{new Date(u.created_at).toLocaleDateString('es-CL')}</p>
-                    </div>
+                    ))}
                   </div>
-                  <div className="mt-3 flex items-center gap-3">
-                    <div className="flex-1">
-                      <label className="text-[10px] text-[#666] mb-1 block">Rol</label>
-                      <select
-                        value={u.role ?? 'user'}
-                        onChange={e => updateUserRole(u.id, e.target.value)}
-                        className="w-full px-2 py-1.5 rounded-lg border border-[#E5E5E5] bg-[#F5F5F5] text-xs text-[#111] focus:outline-none focus:border-[#CC0000]"
-                      >
-                        <option value="user">user</option>
-                        <option value="gym_admin">gym_admin</option>
-                        <option value="fluxfit_admin">fluxfit_admin</option>
-                      </select>
+
+                  {/* User list */}
+                  {filtered.length === 0 && (
+                    <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                      No se encontraron socios
                     </div>
-                    <div className="flex-shrink-0">
-                      <label className="text-[10px] text-[#666] mb-1 block">Premium</label>
-                      <button
-                        onClick={() => toggleUserPremium(u.id, u.is_premium)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          u.is_premium ? 'bg-[#CC0000]' : 'bg-[#E5E5E5]'
+                  )}
+                  {filtered.map((u: any) => {
+                    const status = getUserStatus(u);
+                    const cfg = statusConfig[status];
+                    const daysLeft = u.plan_valid_until
+                      ? Math.ceil((new Date(u.plan_valid_until).getTime() - now) / 86400000)
+                      : null;
+
+                    return (
+                      <div
+                        key={u.id}
+                        className={`bg-white rounded-xl border p-4 space-y-3 ${
+                          status === 'inactivo' ? 'border-[#E5E5E5] opacity-60' : 'border-[#E5E5E5]'
                         }`}
                       >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                          u.is_premium ? 'translate-x-6' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ));
+                        {/* Header row */}
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#CC0000] flex items-center justify-center flex-shrink-0">
+                            <span className="text-white font-bold text-sm">
+                              {(u.full_name ?? u.email ?? '?')[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-[#111] text-sm">{u.full_name ?? 'Sin nombre'}</p>
+                              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.badge}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                                {cfg.label}
+                              </span>
+                            </div>
+                            {u.rut && <p className="text-xs text-[#666] mt-0.5">RUT: {u.rut}</p>}
+                            <p className="text-xs text-[#666] truncate">{u.email}</p>
+                            <p className="text-[10px] text-[#999] mt-0.5">
+                              Ingreso: {new Date(u.created_at).toLocaleDateString('es-CL')}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Plan info */}
+                        <div className="flex items-center justify-between bg-[#F5F5F5] rounded-lg px-3 py-2">
+                          <div>
+                            <p className="text-xs font-bold text-[#111]">
+                              {u.is_premium ? 'Premium — $2.990/mes' : 'Free'}
+                            </p>
+                            {u.plan_valid_until && (
+                              <p className="text-[10px] text-[#666] mt-0.5">
+                                Vence: {new Date(u.plan_valid_until).toLocaleDateString('es-CL')}
+                              </p>
+                            )}
+                          </div>
+                          {daysLeft !== null && daysLeft >= 0 && daysLeft <= 7 && (
+                            <span className="text-xs font-bold text-amber-500 bg-amber-100 px-2 py-0.5 rounded-full">
+                              {daysLeft === 0 ? 'Vence hoy' : `${daysLeft}d restantes`}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => setSelectedUserHistory(selectedUserHistory === u.id ? null : u.id)}
+                            className="py-2 border border-[#E5E5E5] text-[#111] text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                          >
+                            Ver historial
+                          </button>
+                          <button
+                            onClick={() => toggleUserPremium(u.id, u.is_active)}
+                            className={`py-2 text-xs font-bold rounded-xl active:scale-[0.98] transition-transform ${
+                              u.is_active
+                                ? 'border border-[#CC0000] text-[#CC0000]'
+                                : 'bg-[#16A34A] text-white'
+                            }`}
+                          >
+                            {u.is_active ? 'Dar de baja' : 'Dar de alta'}
+                          </button>
+                          <button
+                            onClick={() => showToast(`Aviso enviado a ${u.email}`, 'success')}
+                            className="py-2 border border-[#0EA5E9] text-[#0EA5E9] text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                          >
+                            Avisar vcto.
+                          </button>
+                        </div>
+
+                        {/* History drawer */}
+                        {selectedUserHistory === u.id && (
+                          <div className="border-t border-[#F5F5F5] pt-3 space-y-1">
+                            <p className="text-[10px] font-bold text-[#666] uppercase tracking-wider mb-2">Historial de cuenta</p>
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-[#666]">Registro</span>
+                                <span className="font-medium text-[#111]">{new Date(u.created_at).toLocaleDateString('es-CL')}</span>
+                              </div>
+                              {u.premium_since && (
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-[#666]">Premium desde</span>
+                                  <span className="font-medium text-[#111]">{new Date(u.premium_since).toLocaleDateString('es-CL')}</span>
+                                </div>
+                              )}
+                              {u.plan_valid_until && (
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-[#666]">Vigencia</span>
+                                  <span className={`font-medium ${daysLeft !== null && daysLeft < 0 ? 'text-[#CC0000]' : 'text-[#111]'}`}>
+                                    {new Date(u.plan_valid_until).toLocaleDateString('es-CL')}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex justify-between text-xs">
+                                <span className="text-[#666]">Rol</span>
+                                <span className="font-medium text-[#111]">{u.role ?? 'user'}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-[#666]">Estado cuenta</span>
+                                <span className={`font-bold ${cfg.text}`}>{cfg.label}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              );
             })()}
           </div>
 
