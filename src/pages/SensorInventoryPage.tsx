@@ -128,6 +128,7 @@ export function SensorInventoryPage() {
   const { toast, showToast } = useToast();
   const [kits, setKits] = useState<SensorKit[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [gyms, setGyms] = useState<{ id: string; name: string }[]>([]);
   const [history, setHistory] = useState<SensorHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>('kits');
@@ -136,6 +137,7 @@ export function SensorInventoryPage() {
 
   // Registration form
   const [regForm, setRegForm] = useState({
+    gym_id: '',
     branch_id: '',
     kit_name: 'Acceso Principal',
     brand: '',
@@ -154,7 +156,7 @@ export function SensorInventoryPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [kitsRes, branchesRes, histRes] = await Promise.all([
+    const [kitsRes, branchesRes, gymsRes, histRes] = await Promise.all([
       supabase
         .from('sensor_kits')
         .select(`
@@ -168,6 +170,7 @@ export function SensorInventoryPage() {
         .select('id, name, gym_id, gyms(id, name)')
         .order('gym_id')
         .order('name'),
+      supabase.from('gyms').select('id, name').eq('is_active', true).order('name'),
       supabase
         .from('sensor_history')
         .select('*')
@@ -176,6 +179,7 @@ export function SensorInventoryPage() {
     ]);
     setKits(kitsRes.data ?? []);
     setBranches(branchesRes.data ?? []);
+    setGyms(gymsRes.data ?? []);
     setHistory(histRes.data ?? []);
     setLoading(false);
   }, []);
@@ -186,6 +190,7 @@ export function SensorInventoryPage() {
 
   const validateReg = (): boolean => {
     const errs: Record<string, string> = {};
+    if (!regForm.gym_id) errs.gym_id = 'Selecciona una cadena';
     if (!regForm.branch_id) errs.branch_id = 'Selecciona una sucursal';
     if (!regForm.kit_name.trim()) errs.kit_name = 'Ingresa un nombre para el acceso';
     if (!regForm.brand.trim()) errs.brand = 'Ingresa la marca';
@@ -252,7 +257,7 @@ export function SensorInventoryPage() {
       ]);
       if (sensorsErr) throw sensorsErr;
 
-      setRegForm({ branch_id: '', kit_name: 'Acceso Principal', brand: '', model: '', sn_entry: '', sn_exit: '' });
+      setRegForm({ gym_id: '', branch_id: '', kit_name: 'Acceso Principal', brand: '', model: '', sn_entry: '', sn_exit: '' });
       setRegErrors({});
       setView('kits');
       await fetchData();
@@ -392,13 +397,30 @@ export function SensorInventoryPage() {
               <p className="font-bold text-[#111] text-sm">Ubicación</p>
             </div>
             <div>
+              {label('Cadena de gimnasio')}
+              <select
+                value={regForm.gym_id}
+                onChange={e => setRegForm(f => ({ ...f, gym_id: e.target.value, branch_id: '' }))}
+                className={inp}
+              >
+                <option value="">— Seleccionar cadena —</option>
+                {gyms.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+              {regErrors.gym_id && <p className="text-xs text-[#CC0000] mt-1">{regErrors.gym_id}</p>}
+            </div>
+            <div>
               {label('Sucursal')}
-              <select value={regForm.branch_id} onChange={e => setRegForm(f => ({ ...f, branch_id: e.target.value }))} className={inp}>
+              <select
+                value={regForm.branch_id}
+                onChange={e => setRegForm(f => ({ ...f, branch_id: e.target.value }))}
+                disabled={!regForm.gym_id}
+                className={`${inp} disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
                 <option value="">— Seleccionar sucursal —</option>
-                {branches.map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.gyms?.name || 'Gimnasio independiente'} - {b.name}
-                  </option>
+                {branches.filter(b => b.gym_id === regForm.gym_id).map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
               {regErrors.branch_id && <p className="text-xs text-[#CC0000] mt-1">{regErrors.branch_id}</p>}
@@ -471,6 +493,7 @@ export function SensorInventoryPage() {
 
           {(() => {
             const canSubmit =
+              !!regForm.gym_id &&
               !!regForm.branch_id &&
               !!regForm.sn_entry.trim() &&
               !!regForm.sn_exit.trim() &&
