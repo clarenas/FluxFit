@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Cpu, Wifi, WifiOff, Wrench, Plus, X, RefreshCw,
   ChevronDown, ChevronUp, AlertTriangle, Clock, History,
-  ArrowRightLeft, CheckCircle,
+  ArrowRightLeft, CheckCircle, Radio,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../hooks/useToast';
@@ -55,7 +55,7 @@ interface Branch {
   id: string;
   name: string;
   gym_id: string;
-  gyms?: { name: string } | null;
+  gyms?: { id: string; name: string } | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -165,7 +165,8 @@ export function SensorInventoryPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('gym_branches')
-        .select('id, name, gym_id, gyms(name)')
+        .select('id, name, gym_id, gyms(id, name)')
+        .order('gym_id')
         .order('name'),
       supabase
         .from('sensor_history')
@@ -335,6 +336,18 @@ export function SensorInventoryPage() {
     }
   };
 
+  // ── Simulate ping (dev tool) ───────────────────────────────────────────────
+
+  const simulatePing = async (sensorId: string) => {
+    const { error } = await supabase
+      .from('sensors')
+      .update({ last_heartbeat: new Date().toISOString(), status: 'active' })
+      .eq('id', sensorId);
+    if (error) { showToast('Error al simular ping', 'error'); return; }
+    await fetchData();
+    showToast('Ping simulado — sensor marcado Online', 'success');
+  };
+
   // ── Kit deletion ───────────────────────────────────────────────────────────
 
   const deleteKit = async (kitId: string) => {
@@ -383,7 +396,7 @@ export function SensorInventoryPage() {
               <select value={regForm.branch_id} onChange={e => setRegForm(f => ({ ...f, branch_id: e.target.value }))} className={inp}>
                 <option value="">— Seleccionar sucursal —</option>
                 {branches.map(b => (
-                  <option key={b.id} value={b.id}>{b.gyms?.name ?? 'Gym'} · {b.name}</option>
+                  <option key={b.id} value={b.id}>{b.gyms?.name ?? '(Sin cadena)'} — {b.name}</option>
                 ))}
               </select>
               {regErrors.branch_id && <p className="text-xs text-[#CC0000] mt-1">{regErrors.branch_id}</p>}
@@ -454,17 +467,27 @@ export function SensorInventoryPage() {
             </div>
           </div>
 
-          <button
-            onClick={submitRegistration}
-            disabled={saving}
-            className="w-full py-4 bg-[#CC0000] text-white font-bold rounded-2xl text-sm disabled:opacity-50 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
-          >
-            {saving ? (
-              <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Registrando...</>
-            ) : (
-              <><CheckCircle size={16} /> Confirmar registro del kit</>
-            )}
-          </button>
+          {(() => {
+            const canSubmit =
+              !!regForm.branch_id &&
+              !!regForm.sn_entry.trim() &&
+              !!regForm.sn_exit.trim() &&
+              !!regForm.brand.trim() &&
+              !!regForm.model.trim();
+            return (
+              <button
+                onClick={submitRegistration}
+                disabled={saving || !canSubmit}
+                className="w-full py-4 bg-[#CC0000] text-white font-bold rounded-2xl text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Registrando...</>
+                ) : (
+                  <><CheckCircle size={16} /> Confirmar registro del kit</>
+                )}
+              </button>
+            );
+          })()}
         </div>
       </div>
     );
@@ -804,6 +827,12 @@ export function SensorInventoryPage() {
                               </button>
                             </div>
                           </div>
+                          <button
+                            onClick={() => simulatePing(sensor.id)}
+                            className="mt-1 flex items-center gap-1.5 px-3 py-1.5 bg-[#F0FDF4] border border-[#16A34A]/30 text-[#16A34A] text-[10px] font-bold rounded-lg hover:bg-[#16A34A]/10 transition-colors"
+                          >
+                            <Radio size={10} /> Simular Ping
+                          </button>
                         </div>
                       ) : (
                         <div className="bg-white rounded-xl border-2 border-dashed border-[#E5E5E5] p-4 text-center">
