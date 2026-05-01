@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Plus, X, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Shield, Plus, X, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Building2, Store, ShoppingBag, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatCLP } from '../lib/utils';
@@ -43,7 +43,8 @@ interface AdminFluxFitProps { initialTab?: string; }
 export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState(initialTab ?? 'gyms');
+  const [activeTab, setActiveTab] = useState(initialTab ?? 'dashboard');
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [gyms, setGyms] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
@@ -314,6 +315,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const pendingCount = pendingGyms.length + pendingCommerces.length;
 
   const tabs = [
+    { id: 'dashboard', label: 'Dashboard' },
     { id: 'gyms', label: 'Gyms' },
     { id: 'solicitudes', label: 'Solicitudes' },
     { id: 'pendientes', label: pendingCount > 0 ? `Pendientes (${pendingCount})` : 'Pendientes' },
@@ -352,6 +354,147 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
       <div className="px-4 py-4 max-w-[900px] mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-[#666]">Cargando...</div>
+        ) : activeTab === 'dashboard' ? (
+          <div className="space-y-4">
+            {/* Month selector */}
+            <div className="flex items-center justify-between bg-white rounded-2xl border border-[#E5E5E5] px-4 py-3">
+              <div>
+                <p className="text-xs text-[#666]">Panel Admin</p>
+                <h2 className="font-bold text-[#111] text-base">Dashboard Global</h2>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setSelectedMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F5] transition-colors"
+                >
+                  <ChevronLeft size={16} className="text-[#666]" />
+                </button>
+                <select
+                  value={`${selectedMonth.getFullYear()}-${selectedMonth.getMonth()}`}
+                  onChange={e => {
+                    const [y, mo] = e.target.value.split('-').map(Number);
+                    setSelectedMonth(new Date(y, mo, 1));
+                  }}
+                  className="px-2 py-1 rounded-lg border border-[#E5E5E5] text-xs font-bold text-[#111] focus:outline-none focus:border-[#CC0000] bg-white"
+                >
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1);
+                    return (
+                      <option key={i} value={`${d.getFullYear()}-${d.getMonth()}`}>
+                        {d.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
+                      </option>
+                    );
+                  })}
+                </select>
+                <button
+                  onClick={() => setSelectedMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F5] transition-colors"
+                >
+                  <ChevronRight size={16} className="text-[#666]" />
+                </button>
+              </div>
+            </div>
+
+            {/* Revenue card */}
+            <div className="bg-gradient-to-br from-[#CC0000] to-[#A00000] rounded-2xl p-5 text-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-white/70 text-xs font-medium">Ingresos del mes</p>
+                  <p className="text-3xl font-bold mt-1">$12.450.000</p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <TrendingUp size={13} className="text-white/80" />
+                    <span className="text-sm font-bold text-white">+15%</span>
+                    <span className="text-xs text-white/60">vs mes anterior</span>
+                  </div>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center">
+                  <TrendingUp size={22} className="text-white" />
+                </div>
+              </div>
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Socios Premium', value: '248', delta: '+12', color: 'text-[#CC0000]', bg: 'bg-[#CC0000]/5', icon: Users },
+                { label: 'Gyms Activos', value: String(activeGyms || 35), delta: '+3', color: 'text-[#16A34A]', bg: 'bg-[#16A34A]/5', icon: Building2 },
+                { label: 'Comercios Activos', value: '18', delta: '+2', color: 'text-[#0EA5E9]', bg: 'bg-[#0EA5E9]/5', icon: Store },
+                { label: 'Canjes Totales', value: totalRedemptions > 0 ? (totalRedemptions >= 1000 ? `${(totalRedemptions / 1000).toFixed(1)}K` : String(totalRedemptions)) : '5.2K', delta: '+8%', color: 'text-[#8B5CF6]', bg: 'bg-[#8B5CF6]/5', icon: ShoppingBag },
+              ].map(({ label, value, delta, color, bg, icon: Icon }) => (
+                <div key={label} className="bg-white rounded-2xl border border-[#E5E5E5] p-4">
+                  <div className="flex items-start justify-between gap-1 mb-3">
+                    <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center`}>
+                      <Icon size={16} className={color} />
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${bg} ${color}`}>{delta}</span>
+                  </div>
+                  <p className="text-2xl font-bold text-[#111]">{value}</p>
+                  <p className="text-xs text-[#666] mt-0.5">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Alerts */}
+            <div className="bg-white rounded-2xl border border-[#E5E5E5] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#F5F5F5] flex items-center gap-2">
+                <AlertCircle size={15} className="text-[#CC0000]" />
+                <p className="font-bold text-[#111] text-sm">Alertas</p>
+              </div>
+              <div className="divide-y divide-[#F5F5F5]">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2 h-2 rounded-full bg-[#CC0000]" />
+                    <p className="text-sm text-[#111]">15 socios vencen en 7 días</p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#CC0000]/10 text-[#CC0000]">Urgente</span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2 h-2 rounded-full bg-amber-400" />
+                    <p className="text-sm text-[#111]">3 gyms vencen en 15 días</p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Aviso</span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2 h-2 rounded-full bg-[#16A34A]" />
+                    <p className="text-sm text-[#111]">2 comercios vencen en 20 días</p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#16A34A]/10 text-[#16A34A]">Info</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary table */}
+            <div className="bg-white rounded-2xl border border-[#E5E5E5] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#F5F5F5]">
+                <p className="font-bold text-[#111] text-sm">Resumen de la red</p>
+              </div>
+              <div className="divide-y divide-[#F5F5F5]">
+                <div className="grid grid-cols-4 px-4 py-2 text-[10px] font-bold text-[#999] uppercase tracking-wider">
+                  <span>Categoría</span>
+                  <span className="text-center">Total</span>
+                  <span className="text-center">Activos</span>
+                  <span className="text-right">Ingresos</span>
+                </div>
+                {[
+                  { label: 'Socios', total: users.length || 456, active: users.filter((u: any) => u.is_premium).length || 420, revenue: '$1.2M', color: 'text-[#CC0000]' },
+                  { label: 'Gyms', total: gyms.length || 42, active: activeGyms || 35, revenue: '$5.2M', color: 'text-[#16A34A]' },
+                  { label: 'Comercios', total: commerces.length || 25, active: commerces.filter((c: any) => c.is_active).length || 18, revenue: '$890K', color: 'text-[#0EA5E9]' },
+                ].map(row => (
+                  <div key={row.label} className="grid grid-cols-4 px-4 py-3 items-center">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 rounded-full ${row.color === 'text-[#CC0000]' ? 'bg-[#CC0000]' : row.color === 'text-[#16A34A]' ? 'bg-[#16A34A]' : 'bg-[#0EA5E9]'}`} />
+                      <span className="text-sm font-bold text-[#111]">{row.label}</span>
+                    </div>
+                    <span className="text-sm text-[#666] text-center">{row.total}</span>
+                    <span className={`text-sm font-bold text-center ${row.color}`}>{row.active}</span>
+                    <span className="text-sm font-bold text-[#111] text-right">{row.revenue}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : activeTab === 'gyms' ? (
           <div className="space-y-4">
             {/* Metrics */}
