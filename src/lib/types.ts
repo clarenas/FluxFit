@@ -6,8 +6,14 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
+  rut: string | null;
   is_premium: boolean;
   premium_since: string | null;
+  plan: string;
+  plan_price: number;
+  plan_valid_until: string | null;
+  is_active: boolean;
+  last_expiry_notification: string | null;
   avatar_url: string;
   created_at: string;
   role: string;
