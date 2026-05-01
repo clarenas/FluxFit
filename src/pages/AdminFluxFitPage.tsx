@@ -34,8 +34,14 @@ const expiryWarning = (valid_until: string | null) => {
 };
 
 const EMPTY_FORM = {
-  name: '', address: '', comuna: '', phone: '', website: '',
-  description: '', manager_email: '', plan: 'free', valid_days: '30',
+  name: '', branch_name: '', address: '', comuna: '', phone: '', website: '',
+  description: '', manager_email: '', plan: 'free', plan_price: 0, valid_days: '30',
+};
+
+const PLAN_DISPLAY: Record<string, { label: string; price: string; value: number }> = {
+  free:  { label: 'Free',  price: '$0',       value: 0 },
+  light: { label: 'Light', price: '$89.900',  value: 89900 },
+  pro:   { label: 'Pro',   price: '$149.900', value: 149900 },
 };
 
 interface AdminFluxFitProps { initialTab?: string; }
@@ -63,6 +69,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [gymSearch, setGymSearch] = useState('');
   const [gymFilter, setGymFilter] = useState('todos');
   const [selectedGymHistory, setSelectedGymHistory] = useState<string | null>(null);
+  const [newGym, setNewGym] = useState({ name: '', branch_name: '', plan: 'free', plan_price: 0, services_count: 0, coupons_count: 0, is_active: true });
   const [userSearch, setUserSearch] = useState('');
   const [userFilter, setUserFilter] = useState('todos');
   const [selectedUserHistory, setSelectedUserHistory] = useState<string | null>(null);
@@ -229,6 +236,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const openNewGym = () => {
     setEditingGym(null);
     setGymForm({ ...EMPTY_FORM });
+    setNewGym({ name: '', branch_name: '', plan: 'free', plan_price: 0, services_count: 0, coupons_count: 0, is_active: true });
     setShowGymModal(true);
   };
 
@@ -236,6 +244,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     setEditingGym(gym);
     setGymForm({
       name: gym.name ?? '',
+      branch_name: gym.branch_name ?? '',
       address: gym.address ?? '',
       comuna: gym.comuna ?? '',
       phone: gym.phone ?? '',
@@ -243,9 +252,17 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
       description: gym.description ?? '',
       manager_email: '',
       plan: gym.plan ?? 'free',
+      plan_price: PLAN_DISPLAY[gym.plan ?? 'free']?.value ?? 0,
       valid_days: '30',
     });
     setShowGymModal(true);
+  };
+
+  const closeGymModal = () => {
+    setShowGymModal(false);
+    setEditingGym(null);
+    setGymForm({ ...EMPTY_FORM });
+    setNewGym({ name: '', branch_name: '', plan: 'free', plan_price: 0, services_count: 0, coupons_count: 0, is_active: true });
   };
 
   const saveGym = async () => {
@@ -253,6 +270,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     try {
       const gymPayload = {
         name: gymForm.name,
+        branch_name: gymForm.branch_name || null,
         address: gymForm.address,
         comuna: gymForm.comuna,
         phone: gymForm.phone,
@@ -268,7 +286,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
         const { error: subErr } = await supabase
           .from('gym_subscriptions')
           .upsert(
-            { gym_id: editingGym.id, plan: gymForm.plan, status: 'active', valid_until },
+            { gym_id: editingGym.id, plan: gymForm.plan, plan_price: PLAN_DISPLAY[gymForm.plan]?.value ?? 0, status: 'active', valid_until },
             { onConflict: 'gym_id' }
           );
         if (subErr) {
@@ -276,18 +294,21 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
           return;
         }
       } else {
-        const { data: newGym, error: gymErr } = await supabase
+        const { data: createdGym, error: gymErr } = await supabase
           .from('gyms')
           .insert({ ...gymPayload, is_active: true })
           .select('id')
           .single();
         if (gymErr) throw gymErr;
-        const gymId = newGym.id;
-
-        if (gymForm.plan !== 'free') {
-          const valid_until = new Date(Date.now() + Number(gymForm.valid_days) * 86400000).toISOString();
-          await supabase.from('gym_subscriptions').insert({ gym_id: gymId, plan: gymForm.plan, status: 'active', valid_until });
-        }
+        const gymId = createdGym.id;
+        const valid_until = new Date(Date.now() + 30 * 86400000).toISOString();
+        await supabase.from('gym_subscriptions').insert({
+          gym_id: gymId,
+          plan: gymForm.plan,
+          plan_price: PLAN_DISPLAY[gymForm.plan]?.value ?? 0,
+          status: gymForm.plan === 'free' ? 'inactive' : 'active',
+          valid_until: gymForm.plan === 'free' ? null : valid_until,
+        });
 
         if (gymForm.manager_email) {
           const { data: managerUser } = await supabase
@@ -301,7 +322,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
         }
       }
 
-      setShowGymModal(false);
+      closeGymModal();
       await fetchAll();
       showToast(editingGym ? 'Gym actualizado correctamente' : 'Gym creado correctamente', 'success');
     } catch (err: any) {
@@ -1480,104 +1501,131 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
       {/* Gym Modal */}
       {showGymModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#E5E5E5]">
-              <h2 className="font-bold text-[#111] text-base">{editingGym ? 'Editar gym' : 'Agregar gym'}</h2>
-              <button onClick={() => setShowGymModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F5]">
-                <X size={18} className="text-[#666]" />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E5E5]">
+              <div>
+                <h2 className="font-bold text-[#111] text-base">
+                  {editingGym ? 'Editar Gym' : 'Agregar Nuevo Gym'}
+                </h2>
+                <p className="text-[11px] text-[#666] mt-0.5">
+                  {editingGym ? 'Actualiza los datos del gym registrado' : 'Completa los campos para registrar el gym'}
+                </p>
+              </div>
+              <button
+                onClick={closeGymModal}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F5] text-[#666] transition-colors"
+              >
+                <X size={18} />
               </button>
             </div>
-            <div className="px-6 py-4 space-y-3">
-              {[
-                { label: 'Nombre *', key: 'name', placeholder: 'Nombre del gym', required: true },
-                { label: 'Dirección', key: 'address', placeholder: 'Calle 123' },
-                { label: 'Teléfono', key: 'phone', placeholder: '+56 9 1234 5678' },
-                { label: 'Sitio web', key: 'website', placeholder: 'https://...' },
-              ].map(({ label, key, placeholder }) => (
-                <div key={key}>
-                  <label className="text-xs text-[#666] mb-1 block">{label}</label>
-                  <input
-                    type="text"
-                    value={(gymForm as any)[key]}
-                    onChange={e => setGymForm(f => ({ ...f, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
-                  />
-                </div>
-              ))}
+
+            <div className="px-6 py-5 space-y-4">
+              {/* Nombre de la cadena */}
               <div>
-                <label className="text-xs text-[#666] mb-1 block">Comuna</label>
-                <select
-                  value={gymForm.comuna}
-                  onChange={e => setGymForm(f => ({ ...f, comuna: e.target.value }))}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
-                >
-                  <option value="">Seleccionar</option>
-                  {COMUNAS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-[#666] mb-1 block">Descripción</label>
-                <textarea
-                  value={gymForm.description}
-                  onChange={e => setGymForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Descripción del gym"
-                  rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] resize-none"
+                <label className="block text-xs font-bold text-[#444] mb-1.5">
+                  Nombre de la cadena <span className="text-[#CC0000]">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={gymForm.name}
+                  onChange={e => setGymForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Ej: Bodytech, SmartFit..."
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
                 />
               </div>
+
+              {/* Nombre de la sucursal */}
+              <div>
+                <label className="block text-xs font-bold text-[#444] mb-1.5">Nombre de la sucursal</label>
+                <input
+                  type="text"
+                  value={gymForm.branch_name}
+                  onChange={e => setGymForm(f => ({ ...f, branch_name: e.target.value }))}
+                  placeholder="Ej: Sucursal Providencia, Sede Norte..."
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+                />
+              </div>
+
+              {/* Plan con precio automático */}
+              <div>
+                <label className="block text-xs font-bold text-[#444] mb-1.5">Plan</label>
+                <select
+                  value={gymForm.plan}
+                  onChange={e => setGymForm(f => ({
+                    ...f,
+                    plan: e.target.value,
+                    plan_price: PLAN_DISPLAY[e.target.value]?.value ?? 0,
+                  }))}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+                >
+                  {Object.entries(PLAN_DISPLAY).map(([key, { label, price }]) => (
+                    <option key={key} value={key}>{label} — {price}/mes</option>
+                  ))}
+                </select>
+                {/* Price preview */}
+                <div className="mt-2 flex items-center justify-between px-3 py-2 bg-[#F5F5F5] rounded-lg">
+                  <span className="text-xs text-[#666]">Precio mensual</span>
+                  <span className="text-sm font-bold text-[#CC0000]">
+                    {PLAN_DISPLAY[gymForm.plan]?.price ?? '$0'} CLP
+                  </span>
+                </div>
+              </div>
+
+              {/* Extra fields: address, comuna, phone */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#444] mb-1.5">Teléfono</label>
+                  <input
+                    type="text"
+                    value={gymForm.phone}
+                    onChange={e => setGymForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="+56 9 1234 5678"
+                    className="w-full px-3 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#444] mb-1.5">Comuna</label>
+                  <select
+                    value={gymForm.comuna}
+                    onChange={e => setGymForm(f => ({ ...f, comuna: e.target.value }))}
+                    className="w-full px-3 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+                  >
+                    <option value="">Seleccionar</option>
+                    {COMUNAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
               {!editingGym && (
                 <div>
-                  <label className="text-xs text-[#666] mb-1 block">Email responsable</label>
+                  <label className="block text-xs font-bold text-[#444] mb-1.5">Email del responsable</label>
                   <input
                     type="email"
                     value={gymForm.manager_email}
                     onChange={e => setGymForm(f => ({ ...f, manager_email: e.target.value }))}
                     placeholder="admin@gym.com"
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
-                  />
-                </div>
-              )}
-              <div>
-                <label className="text-xs text-[#666] mb-1 block">Plan</label>
-                <select
-                  value={gymForm.plan}
-                  onChange={e => setGymForm(f => ({ ...f, plan: e.target.value }))}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
-                >
-                  <option value="free">Free</option>
-                  <option value="basico">Básico</option>
-                  <option value="pro">Pro</option>
-                  <option value="full">Full</option>
-                </select>
-              </div>
-              {gymForm.plan !== 'free' && (
-                <div>
-                  <label className="text-xs text-[#666] mb-1 block">Días de vigencia</label>
-                  <input
-                    type="number"
-                    value={gymForm.valid_days}
-                    onChange={e => setGymForm(f => ({ ...f, valid_days: e.target.value }))}
-                    min="1"
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] bg-[#F5F5F5] text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
                   />
                 </div>
               )}
             </div>
-            <div className="flex gap-3 px-6 pb-6 pt-2">
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 pb-6 pt-1">
               <button
-                onClick={() => setShowGymModal(false)}
-                className="flex-1 py-2.5 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+                onClick={closeGymModal}
+                className="flex-1 py-3 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
               >
                 Cancelar
               </button>
               <button
                 onClick={saveGym}
-                disabled={saving || !gymForm.name}
-                className="flex-1 py-2.5 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform disabled:opacity-50"
+                disabled={saving || !gymForm.name.trim()}
+                className="flex-1 py-3 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform disabled:opacity-50"
               >
-                {saving ? 'Guardando...' : 'Guardar'}
+                {saving ? 'Guardando...' : editingGym ? 'Guardar cambios' : 'Crear Gym'}
               </button>
             </div>
           </div>
