@@ -144,6 +144,9 @@ export function SensorInventoryPage() {
     model: '',
     sn_entry: '',
     sn_exit: '',
+    activation_date: new Date().toISOString().split('T')[0],
+    status: 'operativo',
+    observations: '',
   });
   const [regErrors, setRegErrors] = useState<Record<string, string>>({});
 
@@ -257,7 +260,7 @@ export function SensorInventoryPage() {
       ]);
       if (sensorsErr) throw sensorsErr;
 
-      setRegForm({ gym_id: '', branch_id: '', kit_name: 'Acceso Principal', brand: '', model: '', sn_entry: '', sn_exit: '' });
+      setRegForm({ gym_id: '', branch_id: '', kit_name: 'Acceso Principal', brand: '', model: '', sn_entry: '', sn_exit: '', activation_date: new Date().toISOString().split('T')[0], status: 'operativo', observations: '' });
       setRegErrors({});
       setView('kits');
       await fetchData();
