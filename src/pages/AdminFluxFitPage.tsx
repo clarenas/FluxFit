@@ -70,6 +70,13 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [gymFilter, setGymFilter] = useState('todos');
   const [selectedGymHistory, setSelectedGymHistory] = useState<string | null>(null);
   const [newGym, setNewGym] = useState({ name: '', branch_name: '', plan: 'free', plan_price: 0, services_count: 0, coupons_count: 0, is_active: true });
+  const [comercioSearch, setComercioSearch] = useState('');
+  const [comercioFilter, setComercioFilter] = useState('todos');
+  const [selectedComercioHistory, setSelectedComercioHistory] = useState<string | null>(null);
+  const [showAddComercioModal, setShowAddComercioModal] = useState(false);
+  const [editingComercio, setEditingComercio] = useState<any>(null);
+  const [savingComercio, setSavingComercio] = useState(false);
+  const [newComercio, setNewComercio] = useState({ name: '', category: 'nutricion', address: '', plan: 'basic', plan_price: 39900, products_count: 0, coupons_count: 0, canjes_total: 0, is_active: true });
   const [userSearch, setUserSearch] = useState('');
   const [userFilter, setUserFilter] = useState('todos');
   const [selectedUserHistory, setSelectedUserHistory] = useState<string | null>(null);
@@ -170,8 +177,103 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   };
 
   const toggleCommerceActive = async (commerce: any) => {
+    const action = commerce.is_active ? 'dar de baja' : 'dar de alta';
+    if (!window.confirm(`¿Confirmas ${action} a "${commerce.name}"?`)) return;
     await supabase.from('commerces').update({ is_active: !commerce.is_active }).eq('id', commerce.id);
+    showToast(`Comercio ${commerce.is_active ? 'dado de baja' : 'dado de alta'} correctamente`, 'success');
     fetchAll();
+  };
+
+  const deleteComercio = async (commerce: any) => {
+    if (!window.confirm(`¿Eliminar permanentemente "${commerce.name}"? Esta acción no se puede deshacer.`)) return;
+    await supabase.from('commerces').update({ is_active: false }).eq('id', commerce.id);
+    showToast('Comercio eliminado del registro', 'success');
+    fetchAll();
+  };
+
+  const COMERCIO_PLANS: Record<string, { label: string; price: string; value: number }> = {
+    basic:   { label: 'Basic',   price: '$39.900',  value: 39900 },
+    premium: { label: 'Premium', price: '$79.900',  value: 79900 },
+  };
+
+  const CATEGORY_EMOJI: Record<string, string> = {
+    nutricion:    '🥗',
+    suplementos:  '💊',
+    indumentaria: '👕',
+    fisioterapia: '💆',
+    otro:         '🏪',
+  };
+
+  const openNewComercio = () => {
+    setEditingComercio(null);
+    setNewComercio({ name: '', category: 'nutricion', address: '', plan: 'basic', plan_price: 39900, products_count: 0, coupons_count: 0, canjes_total: 0, is_active: true });
+    setShowAddComercioModal(true);
+  };
+
+  const openEditComercio = (c: any) => {
+    setEditingComercio(c);
+    setNewComercio({
+      name: c.name ?? '',
+      category: c.category ?? 'nutricion',
+      address: c.address ?? '',
+      plan: c.plan ?? 'basic',
+      plan_price: COMERCIO_PLANS[c.plan ?? 'basic']?.value ?? 39900,
+      products_count: c.products_count ?? 0,
+      coupons_count: c.coupons_count ?? 0,
+      canjes_total: c.canjes_total ?? 0,
+      is_active: c.is_active ?? true,
+    });
+    setShowAddComercioModal(true);
+  };
+
+  const closeComercioModal = () => {
+    setShowAddComercioModal(false);
+    setEditingComercio(null);
+    setNewComercio({ name: '', category: 'nutricion', address: '', plan: 'basic', plan_price: 39900, products_count: 0, coupons_count: 0, canjes_total: 0, is_active: true });
+  };
+
+  const saveComercio = async () => {
+    if (!newComercio.name.trim()) return;
+    setSavingComercio(true);
+    try {
+      const payload = {
+        name: newComercio.name,
+        category: newComercio.category,
+        address: newComercio.address || null,
+        is_active: newComercio.is_active,
+      };
+      if (editingComercio) {
+        await supabase.from('commerces').update(payload).eq('id', editingComercio.id);
+        const valid_until = newComercio.plan === 'basic'
+          ? new Date(Date.now() + 30 * 86400000).toISOString()
+          : new Date(Date.now() + 30 * 86400000).toISOString();
+        await supabase.from('commerce_subscriptions').upsert(
+          { commerce_id: editingComercio.id, plan: newComercio.plan, status: 'active', valid_until },
+          { onConflict: 'commerce_id' }
+        );
+      } else {
+        const { data: created, error } = await supabase
+          .from('commerces')
+          .insert({ ...payload, approval_status: 'approved' })
+          .select('id')
+          .single();
+        if (error) throw error;
+        const valid_until = new Date(Date.now() + 30 * 86400000).toISOString();
+        await supabase.from('commerce_subscriptions').insert({
+          commerce_id: created.id,
+          plan: newComercio.plan,
+          status: 'active',
+          valid_until,
+        });
+      }
+      closeComercioModal();
+      await fetchAll();
+      showToast(editingComercio ? 'Comercio actualizado correctamente' : 'Comercio creado correctamente', 'success');
+    } catch (err: any) {
+      showToast('Error al guardar: ' + (err?.message ?? 'intenta de nuevo'), 'error');
+    } finally {
+      setSavingComercio(false);
+    }
   };
 
   const toggleGymActive = async (gym: any) => {
@@ -1463,55 +1565,323 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
           </div>
 
         ) : activeTab === 'comercios' ? (
-          <div className="space-y-3">
-            <div className="flex justify-end mb-2">
-              <button
-                onClick={() => alert('Próximamente: agregar comercio desde admin')}
-                className="px-4 py-2 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform">
-                + Agregar comercio
-              </button>
-            </div>
+          <div className="space-y-4">
             {(() => {
-              const mappedCommerces = commerces.map((c: any) => {
+              const now = Date.now();
+              const mapped = commerces.map((c: any) => {
                 const sub = c.commerce_subscriptions?.[0];
-                return { ...c, plan: sub?.plan ?? 'free', sub_status: sub?.status ?? null, valid_until: sub?.valid_until ?? null };
+                const valid_until = sub?.valid_until ?? null;
+                const daysLeft = valid_until ? Math.ceil((new Date(valid_until).getTime() - now) / 86400000) : null;
+                return {
+                  ...c,
+                  plan: sub?.plan ?? 'basic',
+                  sub_status: sub?.status ?? null,
+                  valid_until,
+                  daysLeft,
+                  isExpiringSoon: daysLeft !== null && daysLeft >= 0 && daysLeft <= 20,
+                  isExpired: daysLeft !== null && daysLeft < 0,
+                };
               });
-              if (mappedCommerces.length === 0) return (
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
-                  No hay comercios registrados
-                </div>
-              );
-              return mappedCommerces.map((c: any) => (
-                <div key={c.id} className={`bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3 ${!c.is_active ? 'opacity-50' : ''}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-[#111]">{c.name}</p>
-                      {c.category && <p className="text-xs text-[#666] mt-0.5">{c.category}</p>}
+
+              const filtered = mapped.filter((c: any) => {
+                const q = comercioSearch.toLowerCase();
+                const matchSearch = !q || c.name?.toLowerCase().includes(q) || c.category?.toLowerCase().includes(q);
+                const matchFilter =
+                  comercioFilter === 'todos' ? true :
+                  comercioFilter === 'activos' ? c.is_active :
+                  comercioFilter === 'inactivos' ? !c.is_active :
+                  comercioFilter === 'por_vencer' ? c.isExpiringSoon : true;
+                return matchSearch && matchFilter;
+              });
+
+              const totalComercios = mapped.length;
+              const activeComercios = mapped.filter((c: any) => c.is_active).length;
+              const totalProductos = mapped.reduce((s: number, c: any) => s + (c.products_count ?? 0), 0);
+              const totalCanjes = mapped.reduce((s: number, c: any) => s + (c.canjes_total ?? 0), 0);
+              const expiringComercios = mapped.filter((c: any) => c.isExpiringSoon).length;
+
+              return (
+                <>
+                  {/* Search + Add button */}
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        value={comercioSearch}
+                        onChange={e => setComercioSearch(e.target.value)}
+                        placeholder="Buscar por nombre o categoría..."
+                        className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-[#E5E5E5] bg-white text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
+                      />
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#999] text-sm">🔍</span>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {planBadge(c.plan)}
-                      {c.is_active
-                        ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Activo</span>
-                        : <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-[#CC0000]">Inactivo</span>
-                      }
-                    </div>
+                    <button
+                      onClick={openNewComercio}
+                      className="flex-shrink-0 px-3 py-2.5 bg-[#CC0000] text-white text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                    >
+                      + Agregar
+                    </button>
                   </div>
-                  {c.valid_until && (
-                    <div className="flex items-center gap-1 text-xs">
-                      <span className="text-[#666]">Vigencia:</span>
-                      {expiryWarning(c.valid_until)}
+
+                  {/* Filter chips */}
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {[
+                      { id: 'todos', label: 'Todos' },
+                      { id: 'activos', label: 'Activos' },
+                      { id: 'inactivos', label: 'Inactivos' },
+                      { id: 'por_vencer', label: `Por vencer (${expiringComercios})` },
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setComercioFilter(f.id)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                          comercioFilter === f.id ? 'bg-[#CC0000] text-white' : 'bg-white text-[#666] border border-[#E5E5E5]'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Stats grid */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: 'Total',     value: totalComercios, color: 'text-[#111]' },
+                      { label: 'Activos',   value: activeComercios, color: 'text-[#16A34A]' },
+                      { label: 'Productos', value: totalProductos,  color: 'text-[#0EA5E9]' },
+                      { label: 'Canjes',    value: totalCanjes,     color: 'text-amber-500' },
+                    ].map(s => (
+                      <div key={s.label} className="bg-white rounded-xl border border-[#E5E5E5] p-3 text-center">
+                        <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                        <p className="text-[10px] text-[#666] mt-0.5 leading-tight">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Cards */}
+                  {filtered.length === 0 && (
+                    <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                      No se encontraron comercios
                     </div>
                   )}
-                  <button
-                    onClick={() => toggleCommerceActive(c)}
-                    className={`w-full py-2 text-sm font-bold rounded-xl active:scale-[0.98] transition-transform ${
-                      c.is_active ? 'border border-[#CC0000] text-[#CC0000]' : 'bg-[#16A34A] text-white'
-                    }`}
-                  >
-                    {c.is_active ? 'Desactivar' : 'Activar'}
-                  </button>
-                </div>
-              ));
+                  {filtered.map((c: any) => {
+                    const emoji = CATEGORY_EMOJI[c.category] ?? '🏪';
+                    const statusBadge = !c.is_active
+                      ? { label: 'INACTIVO', dot: 'bg-[#999]', badge: 'bg-[#F5F5F5] text-[#666]' }
+                      : c.isExpiringSoon
+                        ? { label: `VENCE EN ${c.daysLeft}D`, dot: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700' }
+                        : c.isExpired
+                          ? { label: 'VENCIDO', dot: 'bg-[#CC0000]', badge: 'bg-[#CC0000]/10 text-[#CC0000]' }
+                          : { label: 'ACTIVO', dot: 'bg-[#16A34A]', badge: 'bg-[#16A34A]/10 text-[#16A34A]' };
+
+                    return (
+                      <div
+                        key={c.id}
+                        className={`bg-white rounded-2xl border-2 p-5 space-y-4 transition-all ${
+                          !c.is_active ? 'border-[#E5E5E5] opacity-70' : c.isExpiringSoon ? 'border-amber-400' : 'border-[#E5E5E5]'
+                        }`}
+                      >
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{emoji}</span>
+                              <p className="font-bold text-[#111] text-base leading-tight">{c.name}</p>
+                            </div>
+                            {c.address && <p className="text-xs text-[#666] mt-1">📍 {c.address}</p>}
+                            {c.category && (
+                              <p className="text-xs text-[#999] mt-0.5 capitalize">{c.category}</p>
+                            )}
+                          </div>
+                          <span className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${statusBadge.badge}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
+                            {statusBadge.label}
+                          </span>
+                        </div>
+
+                        {/* Info grid */}
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                          <div>
+                            <p className="text-[10px] font-bold text-[#999] uppercase tracking-wider">Plan</p>
+                            <p className="text-xs font-bold text-[#111] mt-0.5">
+                              {COMERCIO_PLANS[c.plan]?.label ?? 'Basic'}
+                              {' '}
+                              <span className="font-normal text-[#666]">{COMERCIO_PLANS[c.plan]?.price ?? '$39.900'}</span>
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[#999] uppercase tracking-wider">Inscripción</p>
+                            <p className="text-xs text-[#111] mt-0.5">
+                              {c.created_at ? new Date(c.created_at).toLocaleDateString('es-CL') : '—'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[#999] uppercase tracking-wider">Vencimiento</p>
+                            <p className={`text-xs font-bold mt-0.5 ${c.isExpiringSoon ? 'text-amber-500' : c.isExpired ? 'text-[#CC0000]' : 'text-[#111]'}`}>
+                              {c.valid_until ? new Date(c.valid_until).toLocaleDateString('es-CL') : 'Sin vencimiento'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[#999] uppercase tracking-wider">Productos / Cupones</p>
+                            <p className="text-xs text-[#111] mt-0.5">
+                              {c.products_count ?? 0} / {c.coupons_count ?? 0} activos
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[#999] uppercase tracking-wider">Total canjes</p>
+                            <p className="text-xs font-bold text-[#0EA5E9] mt-0.5">{c.canjes_total ?? 0}</p>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => setSelectedComercioHistory(selectedComercioHistory === c.id ? null : c.id)}
+                            className={`flex-1 min-w-[45%] py-2 text-xs font-bold rounded-xl active:scale-[0.98] transition-all border ${
+                              selectedComercioHistory === c.id
+                                ? 'bg-[#8B5CF6]/10 border-[#8B5CF6] text-[#8B5CF6]'
+                                : 'border-[#8B5CF6]/40 text-[#8B5CF6]'
+                            }`}
+                          >
+                            {selectedComercioHistory === c.id ? 'Ocultar historial' : 'Ver historial'}
+                          </button>
+                          <button
+                            onClick={() => openEditComercio(c)}
+                            className="flex-1 min-w-[45%] py-2 border border-[#E5E5E5] text-[#111] text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => toggleCommerceActive(c)}
+                            className={`flex-1 min-w-[45%] py-2 text-xs font-bold rounded-xl active:scale-[0.98] transition-transform ${
+                              c.is_active ? 'border border-[#CC0000] text-[#CC0000]' : 'bg-[#16A34A] text-white'
+                            }`}
+                          >
+                            {c.is_active ? 'Dar de baja' : 'Dar de alta'}
+                          </button>
+                          <button
+                            onClick={() => deleteComercio(c)}
+                            className="flex-1 min-w-[45%] py-2 bg-[#CC0000]/10 text-[#CC0000] text-xs font-bold rounded-xl active:scale-[0.98] transition-transform border border-[#CC0000]/20"
+                          >
+                            Eliminar
+                          </button>
+                          {c.is_active && c.isExpiringSoon && (
+                            <button
+                              onClick={() => showToast(`Aviso de vencimiento enviado a ${c.name}`, 'success')}
+                              className="w-full py-2 border border-[#0EA5E9] text-[#0EA5E9] text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                            >
+                              Avisar vencimiento
+                            </button>
+                          )}
+                        </div>
+
+                        {/* History panel */}
+                        {selectedComercioHistory === c.id && (
+                          <div className="border-2 border-[#8B5CF6] rounded-xl overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 bg-[#8B5CF6]/5 border-b border-[#8B5CF6]/20">
+                              <div>
+                                <p className="text-sm font-bold text-[#111]">Historial de {c.name}</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">
+                                  Cliente desde {new Date(c.created_at ?? Date.now()).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => setSelectedComercioHistory(null)}
+                                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#8B5CF6]/10 text-[#666] transition-colors flex-shrink-0"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+
+                            {/* Timeline */}
+                            <div className="px-4 py-4 bg-white">
+                              <div className="relative border-l-2 border-[#E5E5E5] pl-6 space-y-3">
+                                {/* Estado actual */}
+                                <div className="relative">
+                                  <span className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white shadow ${
+                                    !c.is_active ? 'bg-[#999]' : c.isExpiringSoon ? 'bg-amber-400' : 'bg-[#16A34A]'
+                                  }`} />
+                                  <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-bold text-[#111]">Estado actual</p>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge.badge}`}>
+                                        {statusBadge.label}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-[#999] mt-1">Ahora</p>
+                                  </div>
+                                </div>
+
+                                {/* Upgrade de plan */}
+                                {c.plan === 'premium' && (
+                                  <div className="relative">
+                                    <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#8B5CF6] border-2 border-white shadow" />
+                                    <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-bold text-[#111]">Upgrade de plan</p>
+                                        <span className="text-[10px] font-bold text-[#8B5CF6]">Basic → Premium</span>
+                                      </div>
+                                      <p className="text-[10px] text-[#666] mt-0.5">+$40.000/mes de ingresos</p>
+                                      <p className="text-[10px] text-[#999] mt-1">15/03/2026</p>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Pago recibido */}
+                                <div className="relative">
+                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white shadow" />
+                                  <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-bold text-[#111]">Pago recibido</p>
+                                      <span className="text-[10px] font-bold text-[#16A34A]">
+                                        +{COMERCIO_PLANS[c.plan]?.price ?? '$39.900'} CLP
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-[#666] mt-0.5">
+                                      Plan {COMERCIO_PLANS[c.plan]?.label ?? 'Basic'} — Renovación mensual
+                                    </p>
+                                    <p className="text-[10px] text-[#999] mt-1">01/05/2026</p>
+                                  </div>
+                                </div>
+
+                                {/* Inscripción */}
+                                <div className="relative">
+                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#0EA5E9] border-2 border-white shadow" />
+                                  <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-bold text-[#111]">Inscripción inicial</p>
+                                      <span className="text-[10px] text-[#666]">Plan Basic</span>
+                                    </div>
+                                    <p className="text-[10px] text-[#666] mt-0.5 capitalize">{c.category ?? 'Comercio'}</p>
+                                    <p className="text-[10px] text-[#999] mt-1">
+                                      {new Date(c.created_at ?? Date.now()).toLocaleDateString('es-CL')}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Footer summary */}
+                            <div className="grid grid-cols-3 divide-x divide-[#E5E5E5] border-t border-[#E5E5E5]">
+                              <div className="py-3 text-center">
+                                <p className="text-base font-bold text-[#16A34A]">12</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Pagos</p>
+                              </div>
+                              <div className="py-3 text-center">
+                                <p className="text-base font-bold text-[#CC0000]">1</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Atrasos</p>
+                              </div>
+                              <div className="py-3 text-center">
+                                <p className="text-base font-bold text-[#8B5CF6]">2</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Cambios</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              );
             })()}
           </div>
 
@@ -1682,6 +2052,116 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                 className="flex-1 py-3 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform disabled:opacity-50"
               >
                 {saving ? 'Guardando...' : editingGym ? 'Guardar cambios' : 'Crear Gym'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comercio Modal */}
+      {showAddComercioModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E5E5]">
+              <div>
+                <h2 className="font-bold text-[#111] text-base">
+                  {editingComercio ? 'Editar Comercio' : 'Agregar Nuevo Comercio'}
+                </h2>
+                <p className="text-[11px] text-[#666] mt-0.5">
+                  {editingComercio ? 'Actualiza los datos del comercio registrado' : 'Completa los campos para registrar el comercio'}
+                </p>
+              </div>
+              <button
+                onClick={closeComercioModal}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F5] text-[#666] transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {/* Nombre */}
+              <div>
+                <label className="block text-xs font-bold text-[#444] mb-1.5">
+                  Nombre del comercio <span className="text-[#CC0000]">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newComercio.name}
+                  onChange={e => setNewComercio(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Ej: NutriShop, FitStore..."
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+                />
+              </div>
+
+              {/* Categoría */}
+              <div>
+                <label className="block text-xs font-bold text-[#444] mb-1.5">Categoría</label>
+                <select
+                  value={newComercio.category}
+                  onChange={e => setNewComercio(f => ({ ...f, category: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+                >
+                  <option value="nutricion">🥗 Nutrición</option>
+                  <option value="suplementos">💊 Suplementos</option>
+                  <option value="indumentaria">👕 Indumentaria</option>
+                  <option value="fisioterapia">💆 Fisioterapia</option>
+                  <option value="otro">🏪 Otro</option>
+                </select>
+              </div>
+
+              {/* Dirección */}
+              <div>
+                <label className="block text-xs font-bold text-[#444] mb-1.5">Dirección</label>
+                <input
+                  type="text"
+                  value={newComercio.address}
+                  onChange={e => setNewComercio(f => ({ ...f, address: e.target.value }))}
+                  placeholder="Calle 123, Ciudad"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+                />
+              </div>
+
+              {/* Plan */}
+              <div>
+                <label className="block text-xs font-bold text-[#444] mb-1.5">Plan</label>
+                <select
+                  value={newComercio.plan}
+                  onChange={e => setNewComercio(f => ({
+                    ...f,
+                    plan: e.target.value,
+                    plan_price: COMERCIO_PLANS[e.target.value]?.value ?? 39900,
+                  }))}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+                >
+                  {Object.entries(COMERCIO_PLANS).map(([key, { label, price }]) => (
+                    <option key={key} value={key}>{label} — {price}/mes</option>
+                  ))}
+                </select>
+                <div className="mt-2 flex items-center justify-between px-3 py-2 bg-[#F5F5F5] rounded-lg">
+                  <span className="text-xs text-[#666]">Precio mensual</span>
+                  <span className="text-sm font-bold text-[#CC0000]">
+                    {COMERCIO_PLANS[newComercio.plan]?.price ?? '$39.900'} CLP
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 pb-6 pt-1">
+              <button
+                onClick={closeComercioModal}
+                className="flex-1 py-3 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveComercio}
+                disabled={savingComercio || !newComercio.name.trim()}
+                className="flex-1 py-3 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform disabled:opacity-50"
+              >
+                {savingComercio ? 'Guardando...' : editingComercio ? 'Guardar cambios' : 'Crear Comercio'}
               </button>
             </div>
           </div>
