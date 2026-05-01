@@ -794,71 +794,127 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
                         {/* History panel */}
                         {selectedGymHistory === gym.id && (
-                          <div className="border-2 border-[#8B5CF6]/30 rounded-xl overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-3 bg-[#8B5CF6]/5 border-b border-[#8B5CF6]/15">
+                          <div className="border-2 border-[#8B5CF6] rounded-xl overflow-hidden">
+                            {/* Panel header */}
+                            <div className="flex items-center justify-between px-4 py-3 bg-[#8B5CF6]/5 border-b border-[#8B5CF6]/20">
                               <div>
-                                <p className="text-sm font-bold text-[#111]">Historial de {gym.name}</p>
-                                <p className="text-[10px] text-[#666] mt-0.5">
-                                  Registrado el {new Date(gym.created_at ?? Date.now()).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                <p className="text-sm font-bold text-[#111]">
+                                  Historial de {gym.name}
                                 </p>
+                                <p className="text-[10px] text-[#666] mt-0.5">
+                                  Cliente desde {new Date(gym.created_at ?? Date.now()).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
+                                {(gym.sn_entry || gym.sn_exit) && (
+                                  <p className="text-[10px] text-[#999] mt-0.5">
+                                    SN Entrada: {gym.sn_entry ?? '—'} | SN Salida: {gym.sn_exit ?? '—'}
+                                  </p>
+                                )}
                               </div>
                               <button
                                 onClick={() => setSelectedGymHistory(null)}
-                                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#8B5CF6]/10 text-[#666] transition-colors"
+                                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#8B5CF6]/10 text-[#666] transition-colors flex-shrink-0"
                               >
                                 <X size={14} />
                               </button>
                             </div>
+
+                            {/* Timeline */}
                             <div className="px-4 py-4 bg-white">
-                              <div className="relative border-l-2 border-[#E5E5E5] pl-6 space-y-4">
+                              <div className="relative border-l-2 border-[#E5E5E5] pl-6 space-y-3">
+
+                                {/* Event 1: Estado actual */}
                                 <div className="relative">
-                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white shadow" />
+                                  <span className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white shadow ${
+                                    !gym.is_active ? 'bg-[#999]' : isExpiringSoon ? 'bg-amber-400' : 'bg-[#16A34A]'
+                                  }`} />
                                   <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
                                     <div className="flex items-center justify-between gap-2">
-                                      <p className="text-xs font-bold text-[#111]">Pago de suscripción</p>
-                                      <span className="text-[10px] font-bold text-[#16A34A]">+{planPrices[gym.plan] ?? '$0'} CLP</span>
+                                      <p className="text-xs font-bold text-[#111]">Estado actual</p>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                        !gym.is_active
+                                          ? 'bg-[#F5F5F5] text-[#666]'
+                                          : isExpiringSoon
+                                            ? 'bg-amber-100 text-amber-700'
+                                            : 'bg-[#16A34A]/10 text-[#16A34A]'
+                                      }`}>
+                                        {!gym.is_active ? 'INACTIVO' : isExpiringSoon ? `VENCE EN ${gymDaysLeft}D` : 'ACTIVO'}
+                                      </span>
                                     </div>
-                                    <p className="text-[10px] text-[#666] mt-0.5">Plan {gym.plan ? gym.plan.charAt(0).toUpperCase() + gym.plan.slice(1) : 'Free'} — Renovación</p>
-                                    <p className="text-[10px] text-[#999] mt-1">01/05/2026</p>
+                                    <p className="text-[10px] text-[#999] mt-1">Ahora</p>
                                   </div>
                                 </div>
+
+                                {/* Event 2: Upgrade de plan */}
+                                {gym.plan !== 'free' && (
+                                  <div className="relative">
+                                    <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#8B5CF6] border-2 border-white shadow" />
+                                    <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-bold text-[#111]">Upgrade de plan</p>
+                                        <span className="text-[10px] font-bold text-[#8B5CF6]">
+                                          Free → {gym.plan.charAt(0).toUpperCase() + gym.plan.slice(1)}
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-[#666] mt-0.5">
+                                        +{PLAN_DISPLAY[gym.plan]?.price ?? '$0'}/mes de ingresos
+                                      </p>
+                                      <p className="text-[10px] text-[#999] mt-1">15/03/2026</p>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Event 3: Pago recibido */}
+                                {gym.plan !== 'free' && (
+                                  <div className="relative">
+                                    <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white shadow" />
+                                    <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-bold text-[#111]">Pago recibido</p>
+                                        <span className="text-[10px] font-bold text-[#16A34A]">
+                                          +{PLAN_DISPLAY[gym.plan]?.price ?? '$0'} CLP
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-[#666] mt-0.5">
+                                        Plan {gym.plan.charAt(0).toUpperCase() + gym.plan.slice(1)} — Renovación mensual
+                                      </p>
+                                      <p className="text-[10px] text-[#999] mt-1">01/05/2026</p>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Event 4: Inscripción inicial */}
                                 <div className="relative">
                                   <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#0EA5E9] border-2 border-white shadow" />
                                   <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
                                     <div className="flex items-center justify-between gap-2">
-                                      <p className="text-xs font-bold text-[#111]">Sensor {gym.sensor_online ? 'en línea' : 'desconectado'}</p>
-                                      <span className={`text-[10px] font-bold ${gym.sensor_online ? 'text-[#16A34A]' : 'text-[#CC0000]'}`}>
-                                        {gym.sensor_online ? 'Online' : 'Offline'}
-                                      </span>
-                                    </div>
-                                    <p className="text-[10px] text-[#666] mt-0.5">{gym.branch_count} sucursal{gym.branch_count !== 1 ? 'es' : ''} registrada{gym.branch_count !== 1 ? 's' : ''}</p>
-                                    <p className="text-[10px] text-[#999] mt-1">Estado actual</p>
-                                  </div>
-                                </div>
-                                <div className="relative">
-                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#8B5CF6] border-2 border-white shadow" />
-                                  <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <p className="text-xs font-bold text-[#111]">Gym registrado</p>
+                                      <p className="text-xs font-bold text-[#111]">Inscripción inicial</p>
                                       <span className="text-[10px] text-[#666]">Plan Free</span>
                                     </div>
-                                    <p className="text-[10px] text-[#999] mt-1">{new Date(gym.created_at ?? Date.now()).toLocaleDateString('es-CL')}</p>
+                                    <p className="text-[10px] text-[#666] mt-0.5">
+                                      Sucursal: {gym.branch_name ?? gym.comuna ?? '—'}
+                                    </p>
+                                    <p className="text-[10px] text-[#999] mt-1">
+                                      {new Date(gym.created_at ?? Date.now()).toLocaleDateString('es-CL')}
+                                    </p>
                                   </div>
                                 </div>
+
                               </div>
                             </div>
+
+                            {/* Footer summary */}
                             <div className="grid grid-cols-3 divide-x divide-[#E5E5E5] border-t border-[#E5E5E5]">
                               <div className="py-3 text-center">
-                                <p className="text-base font-bold text-[#16A34A]">{gym.branch_count}</p>
-                                <p className="text-[10px] text-[#666] mt-0.5">Sucursales</p>
+                                <p className="text-base font-bold text-[#16A34A]">12</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Pagos</p>
                               </div>
                               <div className="py-3 text-center">
-                                <p className="text-base font-bold text-[#0EA5E9]">{gym.admin_count}</p>
-                                <p className="text-[10px] text-[#666] mt-0.5">Admins</p>
+                                <p className="text-base font-bold text-[#CC0000]">1</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Atrasos</p>
                               </div>
                               <div className="py-3 text-center">
-                                <p className="text-base font-bold text-[#CC0000]">{gym.current_count ?? 0}</p>
-                                <p className="text-[10px] text-[#666] mt-0.5">Ocupación</p>
+                                <p className="text-base font-bold text-[#8B5CF6]">2</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Cambios</p>
                               </div>
                             </div>
                           </div>
