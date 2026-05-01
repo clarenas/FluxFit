@@ -22,7 +22,6 @@ export function FluxFitLogo({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg' }) {
         <span className="text-[#CC0000]">FLUX</span>
         <span className="text-[#111111]">FIT</span>
       </div>
-      {size === 'lg' && <p className="text-base text-[#666666] font-normal not-italic">FluxFit - Gestión de Ocupación</p>}
     </div>
   );
 }
