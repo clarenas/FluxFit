@@ -60,6 +60,9 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [saving, setSaving] = useState(false);
   const [approvingRequest, setApprovingRequest] = useState<any>(null);
   const [approvalPlan, setApprovalPlan] = useState('basico');
+  const [gymSearch, setGymSearch] = useState('');
+  const [gymFilter, setGymFilter] = useState('todos');
+  const [selectedGymHistory, setSelectedGymHistory] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [userFilter, setUserFilter] = useState('todos');
   const [selectedUserHistory, setSelectedUserHistory] = useState<string | null>(null);
@@ -499,141 +502,271 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
           </div>
         ) : activeTab === 'gyms' ? (
           <div className="space-y-4">
-            {/* Metrics */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                <p className="text-2xl font-bold text-[#111]">{activeGyms}</p>
-                <p className="text-xs text-[#666] mt-0.5">Gyms activos</p>
-              </div>
-              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                <p className={`text-2xl font-bold ${offlineSensors > 0 ? 'text-[#CC0000]' : 'text-[#111]'}`}>{offlineSensors}</p>
-                <p className="text-xs text-[#666] mt-0.5">Sensores offline</p>
-              </div>
-              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                <p className={`text-2xl font-bold ${expiringSoon > 0 ? 'text-amber-500' : 'text-[#111]'}`}>{expiringSoon}</p>
-                <p className="text-xs text-[#666] mt-0.5">Vencen en &lt;7 días</p>
-              </div>
-              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                <p className="text-lg font-bold text-[#111]">${monthlyRevenue.toLocaleString('es-CL')}</p>
-                <p className="text-xs text-[#666] mt-0.5">Ingresos est. mes</p>
-              </div>
-              <div className="bg-[#CC0000] rounded-xl p-4 text-center col-span-2">
-                <p className="text-2xl font-bold text-white">{totalRedemptions}</p>
-                <p className="text-xs text-white/80 mt-0.5">Ventas Generadas (canjes totales)</p>
-                <p className="text-xs text-white/60 mt-0.5">{thisMonthRedemptions} este mes · {premiumUsers} usuarios Premium</p>
-              </div>
-            </div>
-
-            {/* Add gym button */}
-            <div className="flex justify-end">
+            {/* Search + add */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={gymSearch}
+                onChange={e => setGymSearch(e.target.value)}
+                placeholder="Buscar por cadena o sucursal..."
+                className="flex-1 px-4 py-2.5 rounded-xl border border-[#E5E5E5] bg-white text-sm text-[#111] focus:outline-none focus:border-[#CC0000]"
+              />
               <button
                 onClick={openNewGym}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-[#CC0000] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform flex-shrink-0"
               >
-                <Plus size={16} />
-                Agregar gym
+                <Plus size={15} />
+                Agregar
               </button>
             </div>
 
-            {/* Gym cards */}
-            {gyms.length === 0 && (
-              <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
-                No hay gyms registrados
-              </div>
-            )}
-            {gyms.map(gym => (
-              <div key={gym.id} className={`bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3 ${!gym.is_active ? 'opacity-50' : ''}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-bold text-[#111]">{gym.name}</p>
-                    <p className="text-xs text-[#666] mt-0.5">{gym.comuna}</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {planBadge(gym.plan)}
-                    <span className={`w-2 h-2 rounded-full ${gym.sensor_online ? 'bg-green-500' : 'bg-[#CC0000]'}`} />
-                  </div>
-                </div>
+            {/* Filter chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {[
+                { id: 'todos', label: 'Todos' },
+                { id: 'activos', label: 'Activos' },
+                { id: 'inactivos', label: 'Inactivos' },
+                { id: 'por_vencer', label: 'Por vencer' },
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setGymFilter(f.id)}
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                    gymFilter === f.id ? 'bg-[#CC0000] text-white' : 'bg-white text-[#666] border border-[#E5E5E5]'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
 
-                {/* Occupancy bar */}
-                <div>
-                  <div className="flex justify-between text-xs text-[#666] mb-1">
-                    <span>Ocupación</span>
-                    <span>{gym.current_count ?? 0}/{gym.max_capacity ?? '?'}</span>
-                  </div>
-                  <div className="h-1.5 bg-[#F5F5F5] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#CC0000] rounded-full transition-all"
-                      style={{ width: gym.max_capacity ? `${Math.min(100, ((gym.current_count ?? 0) / gym.max_capacity) * 100)}%` : '0%' }}
-                    />
-                  </div>
-                </div>
+            {(() => {
+              const now = Date.now();
+              const totalGyms = gyms.length;
+              const activeGymsCount = gyms.filter(g => g.is_active).length;
+              const proGymsCount = gyms.filter(g => g.plan === 'pro').length;
+              const expiringGymsCount = gyms.filter(g => {
+                if (!g.valid_until) return false;
+                const diff = (new Date(g.valid_until).getTime() - now) / 86400000;
+                return diff >= 0 && diff <= 15;
+              }).length;
 
-                <div className="flex items-center gap-3 text-xs text-[#666]">
-                  <span>{gym.branch_count} sucursal{gym.branch_count !== 1 ? 'es' : ''}</span>
-                  <span>{gym.admin_count} admin{gym.admin_count !== 1 ? 's' : ''}</span>
-                  {expiryWarning(gym.valid_until)}
-                  {gym.max_branches != null && (
-                    <span className="text-[#999]">máx. {gym.max_branches} suc.</span>
+              const q = gymSearch.toLowerCase();
+              const filtered = gyms.filter(g => {
+                if (q && !g.name?.toLowerCase().includes(q) && !g.comuna?.toLowerCase().includes(q)) return false;
+                if (gymFilter === 'activos') return g.is_active === true;
+                if (gymFilter === 'inactivos') return g.is_active === false;
+                if (gymFilter === 'por_vencer') {
+                  if (!g.valid_until) return false;
+                  const diff = (new Date(g.valid_until).getTime() - now) / 86400000;
+                  return diff >= 0 && diff <= 15;
+                }
+                return true;
+              });
+
+              return (
+                <>
+                  {/* Stats grid */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: 'Total', value: totalGyms, color: 'text-[#111]' },
+                      { label: 'Activos', value: activeGymsCount, color: 'text-[#16A34A]' },
+                      { label: 'Plan Pro', value: proGymsCount, color: 'text-[#0EA5E9]' },
+                      { label: 'Por vencer', value: expiringGymsCount, color: 'text-amber-500' },
+                    ].map(s => (
+                      <div key={s.label} className="bg-white rounded-xl border border-[#E5E5E5] p-3 text-center">
+                        <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                        <p className="text-[10px] text-[#666] mt-0.5 leading-tight">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Gym cards */}
+                  {filtered.length === 0 && (
+                    <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
+                      No se encontraron gyms
+                    </div>
                   )}
-                </div>
+                  {filtered.map(gym => (
+                    <div key={gym.id} className={`bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3 ${!gym.is_active ? 'opacity-60' : ''}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-bold text-[#111]">{gym.name}</p>
+                          <p className="text-xs text-[#666] mt-0.5">{gym.comuna}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {planBadge(gym.plan)}
+                          <span className={`w-2 h-2 rounded-full ${gym.sensor_online ? 'bg-green-500' : 'bg-[#CC0000]'}`} />
+                        </div>
+                      </div>
 
-                {/* Plan upgrade selector */}
-                <div className="bg-[#F5F5F5] rounded-xl p-3 space-y-2">
-                  <p className="text-[10px] font-bold text-[#666] uppercase tracking-wider">Cambiar plan</p>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {(['free', 'light', 'pro'] as const).map(p => {
-                      const labels: Record<string, string> = { free: 'Free', light: 'Light', pro: 'Pro' };
-                      const prices: Record<string, string> = { free: '$0', light: '$89.900', pro: '$149.900' };
-                      const isCurrent = gym.plan === p;
-                      const isUpdating = updatingPlan === gym.id;
-                      return (
+                      {/* Occupancy bar */}
+                      <div>
+                        <div className="flex justify-between text-xs text-[#666] mb-1">
+                          <span>Ocupación</span>
+                          <span>{gym.current_count ?? 0}/{gym.max_capacity ?? '?'}</span>
+                        </div>
+                        <div className="h-1.5 bg-[#F5F5F5] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#CC0000] rounded-full transition-all"
+                            style={{ width: gym.max_capacity ? `${Math.min(100, ((gym.current_count ?? 0) / gym.max_capacity) * 100)}%` : '0%' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-[#666]">
+                        <span>{gym.branch_count} sucursal{gym.branch_count !== 1 ? 'es' : ''}</span>
+                        <span>{gym.admin_count} admin{gym.admin_count !== 1 ? 's' : ''}</span>
+                        {expiryWarning(gym.valid_until)}
+                        {gym.max_branches != null && (
+                          <span className="text-[#999]">máx. {gym.max_branches} suc.</span>
+                        )}
+                      </div>
+
+                      {/* Plan upgrade selector */}
+                      <div className="bg-[#F5F5F5] rounded-xl p-3 space-y-2">
+                        <p className="text-[10px] font-bold text-[#666] uppercase tracking-wider">Cambiar plan</p>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {(['free', 'light', 'pro'] as const).map(p => {
+                            const labels: Record<string, string> = { free: 'Free', light: 'Light', pro: 'Pro' };
+                            const prices: Record<string, string> = { free: '$0', light: '$89.900', pro: '$149.900' };
+                            const isCurrent = gym.plan === p;
+                            const isUpdating = updatingPlan === gym.id;
+                            return (
+                              <button
+                                key={p}
+                                disabled={isCurrent || isUpdating}
+                                onClick={() => updatePartnerPlan(gym, p)}
+                                className={`py-2 rounded-lg text-xs font-bold transition-all active:scale-[0.97] disabled:cursor-default ${
+                                  isCurrent
+                                    ? 'bg-[#CC0000] text-white'
+                                    : 'bg-white border border-[#E5E5E5] text-[#444] hover:border-[#CC0000] hover:text-[#CC0000] disabled:opacity-50'
+                                }`}
+                              >
+                                <span className="block">{labels[p]}</span>
+                                <span className={`block text-[9px] font-normal ${isCurrent ? 'text-white/70' : 'text-[#999]'}`}>{prices[p]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {updatingPlan === gym.id && (
+                          <p className="text-[10px] text-[#666] text-center">Actualizando plan...</p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2 pt-1">
                         <button
-                          key={p}
-                          disabled={isCurrent || isUpdating}
-                          onClick={() => updatePartnerPlan(gym, p)}
-                          className={`py-2 rounded-lg text-xs font-bold transition-all active:scale-[0.97] disabled:cursor-default ${
-                            isCurrent
-                              ? 'bg-[#CC0000] text-white'
-                              : 'bg-white border border-[#E5E5E5] text-[#444] hover:border-[#CC0000] hover:text-[#CC0000] disabled:opacity-50'
+                          onClick={() => setSelectedGymHistory(selectedGymHistory === gym.id ? null : gym.id)}
+                          className={`py-2 text-xs font-bold rounded-xl active:scale-[0.98] transition-all border ${
+                            selectedGymHistory === gym.id
+                              ? 'bg-[#0EA5E9]/10 border-[#0EA5E9] text-[#0EA5E9]'
+                              : 'border-[#E5E5E5] text-[#111]'
                           }`}
                         >
-                          <span className="block">{labels[p]}</span>
-                          <span className={`block text-[9px] font-normal ${isCurrent ? 'text-white/70' : 'text-[#999]'}`}>{prices[p]}</span>
+                          {selectedGymHistory === gym.id ? 'Ocultar' : 'Historial'}
                         </button>
-                      );
-                    })}
-                  </div>
-                  {updatingPlan === gym.id && (
-                    <p className="text-[10px] text-[#666] text-center">Actualizando plan...</p>
-                  )}
-                </div>
+                        <button
+                          onClick={() => openEditGym(gym)}
+                          className="py-2 border border-[#E5E5E5] text-[#111] text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => toggleGymActive(gym)}
+                          className={`py-2 text-xs font-bold rounded-xl active:scale-[0.98] transition-transform ${
+                            gym.is_active
+                              ? 'border border-[#CC0000] text-[#CC0000]'
+                              : 'bg-[#16A34A] text-white'
+                          }`}
+                        >
+                          {gym.is_active ? 'Desactivar' : 'Activar'}
+                        </button>
+                        <button
+                          onClick={() => navigate(`/gym/${gym.id}`)}
+                          className="py-2 bg-[#111] text-white text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                        >
+                          Ver perfil
+                        </button>
+                      </div>
 
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={() => openEditGym(gym)}
-                    className="flex-1 py-2 border border-[#E5E5E5] text-[#111] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => toggleGymActive(gym)}
-                    className={`flex-1 py-2 text-sm font-bold rounded-xl active:scale-[0.98] transition-transform ${
-                      gym.is_active
-                        ? 'border border-[#CC0000] text-[#CC0000]'
-                        : 'bg-[#16A34A] text-white'
-                    }`}
-                  >
-                    {gym.is_active ? 'Desactivar' : 'Activar'}
-                  </button>
-                  <button
-                    onClick={() => navigate(`/gym/${gym.id}`)}
-                    className="flex-1 py-2 bg-[#111] text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
-                  >
-                    Ver perfil
-                  </button>
-                </div>
-              </div>
-            ))}
+                      {/* Gym history panel */}
+                      {selectedGymHistory === gym.id && (
+                        <div className="border-2 border-[#0EA5E9]/30 rounded-lg overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-3 bg-[#0EA5E9]/5 border-b border-[#0EA5E9]/15">
+                            <div>
+                              <p className="text-sm font-bold text-[#111]">Historial de {gym.name}</p>
+                              <p className="text-[10px] text-[#666] mt-0.5">
+                                Registrado el {new Date(gym.created_at ?? Date.now()).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setSelectedGymHistory(null)}
+                              className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#0EA5E9]/10 text-[#666] transition-colors"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          <div className="px-4 py-4 bg-white">
+                            <div className="relative border-l-2 border-[#E5E5E5] pl-6 space-y-4">
+                              <div className="relative">
+                                <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white shadow" />
+                                <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-bold text-[#111]">Pago de suscripción</p>
+                                    <span className="text-[10px] font-bold text-[#16A34A]">+$89.900 CLP</span>
+                                  </div>
+                                  <p className="text-[10px] text-[#666] mt-0.5">Plan {gym.plan !== 'free' ? gym.plan.charAt(0).toUpperCase() + gym.plan.slice(1) : 'Light'} — Renovación</p>
+                                  <p className="text-[10px] text-[#999] mt-1">01/05/2026</p>
+                                </div>
+                              </div>
+                              <div className="relative">
+                                <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#0EA5E9] border-2 border-white shadow" />
+                                <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-bold text-[#111]">Sensor conectado</p>
+                                    <span className={`text-[10px] font-bold ${gym.sensor_online ? 'text-[#16A34A]' : 'text-[#CC0000]'}`}>
+                                      {gym.sensor_online ? 'Online' : 'Offline'}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-[#666] mt-0.5">{gym.branch_count} sucursal{gym.branch_count !== 1 ? 'es' : ''} activa{gym.branch_count !== 1 ? 's' : ''}</p>
+                                  <p className="text-[10px] text-[#999] mt-1">Última actualización</p>
+                                </div>
+                              </div>
+                              <div className="relative">
+                                <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#0EA5E9] border-2 border-white shadow" />
+                                <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-bold text-[#111]">Gym registrado</p>
+                                    <span className="text-[10px] text-[#666]">Plan Free</span>
+                                  </div>
+                                  <p className="text-[10px] text-[#999] mt-1">{new Date(gym.created_at ?? Date.now()).toLocaleDateString('es-CL')}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 divide-x divide-[#E5E5E5] border-t border-[#E5E5E5]">
+                            <div className="py-3 text-center">
+                              <p className="text-base font-bold text-[#16A34A]">{gym.branch_count}</p>
+                              <p className="text-[10px] text-[#666] mt-0.5">Sucursales</p>
+                            </div>
+                            <div className="py-3 text-center">
+                              <p className="text-base font-bold text-[#0EA5E9]">{gym.admin_count}</p>
+                              <p className="text-[10px] text-[#666] mt-0.5">Admins</p>
+                            </div>
+                            <div className="py-3 text-center">
+                              <p className="text-base font-bold text-[#CC0000]">{gym.current_count ?? 0}</p>
+                              <p className="text-[10px] text-[#666] mt-0.5">Ocupación</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
           </div>
         ) : activeTab === 'solicitudes' ? (
           <div className="space-y-4">
