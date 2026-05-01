@@ -12,6 +12,7 @@ import { GymAdminPage } from './pages/GymAdminPage';
 import { CommerceAdminPage } from './pages/CommerceAdminPage';
 import { ContactPage } from './pages/ContactPage';
 import { AdminFluxFitPage } from './pages/AdminFluxFitPage';
+import { SensorInventoryPage } from './pages/SensorInventoryPage';
 
 // Resolves where an authenticated user should land when hitting "/"
 function roleHome(role: string | undefined): string {
@@ -60,7 +61,7 @@ function AppShell() {
   const showNav = [
     '/home', '/favorites', '/premium', '/profile',
     '/admin/gym', '/admin/commerce', '/admin/fluxfit',
-  ].some(p => location.pathname.startsWith(p));
+  ].some(p => location.pathname.startsWith(p)); // /admin/fluxfit covers /admin/fluxfit/sensores too
 
   // While auth is resolving, render nothing to avoid flash
   if (loading) return <LoadingScreen />;
@@ -107,10 +108,11 @@ function AppShell() {
             <Route path="/admin/commerce/premium"  element={<RoleGuard role="commerce_admin"><CommerceAdminPage initialTab="mi_plan" /></RoleGuard>} />
 
             {/* FluxFit super-admin routes — role-gated */}
-            <Route path="/admin/fluxfit"        element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage /></RoleGuard>} />
-            <Route path="/admin/fluxfit/socios" element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="pendientes" /></RoleGuard>} />
-            <Route path="/admin/fluxfit/impacto" element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="impacto" /></RoleGuard>} />
-            <Route path="/admin/fluxfit/config" element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="usuarios" /></RoleGuard>} />
+            <Route path="/admin/fluxfit"           element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage /></RoleGuard>} />
+            <Route path="/admin/fluxfit/socios"    element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="pendientes" /></RoleGuard>} />
+            <Route path="/admin/fluxfit/impacto"   element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="impacto" /></RoleGuard>} />
+            <Route path="/admin/fluxfit/config"    element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="usuarios" /></RoleGuard>} />
+            <Route path="/admin/fluxfit/sensores"  element={<RoleGuard role="fluxfit_admin"><SensorInventoryPage /></RoleGuard>} />
 
             {/* Catch-all: send to role home */}
             <Route path="*" element={<Navigate to={user ? roleHome(user.role) : '/auth'} replace />} />

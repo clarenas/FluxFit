@@ -1,6 +1,6 @@
 import {
   Home, Heart, Star, User, LayoutDashboard, GitBranch,
-  Tag, BarChart2, Ticket, Users, TrendingUp, Settings,
+  Tag, BarChart2, Ticket, Users, TrendingUp, Settings, Cpu,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -28,10 +28,11 @@ const ROLE_TABS: Record<string, NavTab[]> = {
     { path: '/admin/commerce/premium', label: 'Mi Plan',     Icon: Star },
   ],
   fluxfit_admin: [
-    { path: '/admin/fluxfit',         label: 'Dashboard', Icon: LayoutDashboard },
-    { path: '/admin/fluxfit/socios',  label: 'Socios',    Icon: Users },
-    { path: '/admin/fluxfit/impacto', label: 'Impacto',   Icon: TrendingUp },
-    { path: '/admin/fluxfit/config',  label: 'Config',    Icon: Settings },
+    { path: '/admin/fluxfit',          label: 'Dashboard', Icon: LayoutDashboard },
+    { path: '/admin/fluxfit/socios',   label: 'Socios',    Icon: Users },
+    { path: '/admin/fluxfit/sensores', label: 'Sensores',  Icon: Cpu },
+    { path: '/admin/fluxfit/impacto',  label: 'Impacto',   Icon: TrendingUp },
+    { path: '/admin/fluxfit/config',   label: 'Config',    Icon: Settings },
   ],
 };
 
