@@ -867,9 +867,13 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                         <div className="grid grid-cols-3 gap-2">
                           <button
                             onClick={() => setSelectedUserHistory(selectedUserHistory === u.id ? null : u.id)}
-                            className="py-2 border border-[#E5E5E5] text-[#111] text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                            className={`py-2 text-xs font-bold rounded-xl active:scale-[0.98] transition-all border ${
+                              selectedUserHistory === u.id
+                                ? 'bg-[#8B5CF6]/10 border-[#8B5CF6] text-[#8B5CF6]'
+                                : 'border-[#E5E5E5] text-[#111]'
+                            }`}
                           >
-                            Ver historial
+                            {selectedUserHistory === u.id ? 'Ocultar historial' : 'Ver historial'}
                           </button>
                           <button
                             onClick={() => toggleUserPremium(u.id, u.is_active)}
@@ -889,36 +893,87 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                           </button>
                         </div>
 
-                        {/* History drawer */}
+                        {/* History panel */}
                         {selectedUserHistory === u.id && (
-                          <div className="border-t border-[#F5F5F5] pt-3 space-y-1">
-                            <p className="text-[10px] font-bold text-[#666] uppercase tracking-wider mb-2">Historial de cuenta</p>
-                            <div className="space-y-1.5">
-                              <div className="flex justify-between text-xs">
-                                <span className="text-[#666]">Registro</span>
-                                <span className="font-medium text-[#111]">{new Date(u.created_at).toLocaleDateString('es-CL')}</span>
+                          <div className="border-2 border-[#8B5CF6]/30 rounded-lg overflow-hidden transition-all">
+                            {/* Panel header */}
+                            <div className="flex items-center justify-between px-4 py-3 bg-[#8B5CF6]/5 border-b border-[#8B5CF6]/15">
+                              <div>
+                                <p className="text-sm font-bold text-[#111]">
+                                  Historial de {u.full_name?.split(' ')[0] ?? 'socio'}
+                                </p>
+                                <p className="text-[10px] text-[#666] mt-0.5">
+                                  Cliente desde {new Date(u.created_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
                               </div>
-                              {u.premium_since && (
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-[#666]">Premium desde</span>
-                                  <span className="font-medium text-[#111]">{new Date(u.premium_since).toLocaleDateString('es-CL')}</span>
+                              <button
+                                onClick={() => setSelectedUserHistory(null)}
+                                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#8B5CF6]/10 text-[#666] transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+
+                            {/* Timeline */}
+                            <div className="px-4 py-4 bg-white">
+                              <div className="relative border-l-2 border-[#E5E5E5] pl-6 space-y-4">
+
+                                {/* Event: Pago recibido */}
+                                <div className="relative">
+                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#8B5CF6] border-2 border-white shadow" />
+                                  <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-bold text-[#111]">Pago recibido</p>
+                                      <span className="text-[10px] font-bold text-[#16A34A]">+$2.990 CLP</span>
+                                    </div>
+                                    <p className="text-[10px] text-[#666] mt-0.5">Plan Premium — Mes 4</p>
+                                    <p className="text-[10px] text-[#999] mt-1">15/04/2026</p>
+                                  </div>
                                 </div>
-                              )}
-                              {u.plan_valid_until && (
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-[#666]">Vigencia</span>
-                                  <span className={`font-medium ${daysLeft !== null && daysLeft < 0 ? 'text-[#CC0000]' : 'text-[#111]'}`}>
-                                    {new Date(u.plan_valid_until).toLocaleDateString('es-CL')}
-                                  </span>
+
+                                {/* Event: Upgrade */}
+                                <div className="relative">
+                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#8B5CF6] border-2 border-white shadow" />
+                                  <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-bold text-[#111]">Upgrade a Premium</p>
+                                      <span className="text-[10px] font-bold text-[#8B5CF6]">+$2.990/mes</span>
+                                    </div>
+                                    <p className="text-[10px] text-[#666] mt-0.5">Cambio de Free a Premium</p>
+                                    <p className="text-[10px] text-[#999] mt-1">15/01/2026</p>
+                                  </div>
                                 </div>
-                              )}
-                              <div className="flex justify-between text-xs">
-                                <span className="text-[#666]">Rol</span>
-                                <span className="font-medium text-[#111]">{u.role ?? 'user'}</span>
+
+                                {/* Event: Registro */}
+                                <div className="relative">
+                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#0EA5E9] border-2 border-white shadow" />
+                                  <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-bold text-[#111]">Registro inicial</p>
+                                      <span className="text-[10px] text-[#666]">Plan Free</span>
+                                    </div>
+                                    <p className="text-[10px] text-[#999] mt-1">
+                                      {new Date(u.created_at).toLocaleDateString('es-CL')}
+                                    </p>
+                                  </div>
+                                </div>
+
                               </div>
-                              <div className="flex justify-between text-xs">
-                                <span className="text-[#666]">Estado cuenta</span>
-                                <span className={`font-bold ${cfg.text}`}>{cfg.label}</span>
+                            </div>
+
+                            {/* Footer summary */}
+                            <div className="grid grid-cols-3 divide-x divide-[#E5E5E5] border-t border-[#E5E5E5]">
+                              <div className="py-3 text-center">
+                                <p className="text-base font-bold text-[#16A34A]">4</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Pagos</p>
+                              </div>
+                              <div className="py-3 text-center">
+                                <p className="text-base font-bold text-[#CC0000]">0</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Atrasos</p>
+                              </div>
+                              <div className="py-3 text-center">
+                                <p className="text-base font-bold text-[#8B5CF6]">1</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Cambios</p>
                               </div>
                             </div>
                           </div>
