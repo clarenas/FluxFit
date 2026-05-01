@@ -32,7 +32,7 @@ export function SplashPage() {
       <p className={`text-[#666666] text-sm transition-all duration-500 ${
         taglineVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
       }`}>
-        Tu gym. Tu tiempo.
+        Hecho por Humanas
       </p>
     </div>
   );
