@@ -193,7 +193,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
   const COMERCIO_PLANS: Record<string, { label: string; price: string; value: number }> = {
     basic:   { label: 'Basic',   price: '$39.900',  value: 39900 },
-    premium: { label: 'Premium', price: '$79.900',  value: 79900 },
+    premium: { label: 'Premium', price: '$69.900',  value: 69900 },
   };
 
   const CATEGORY_EMOJI: Record<string, string> = {
@@ -1777,6 +1777,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                         {/* History panel */}
                         {selectedComercioHistory === c.id && (
                           <div className="border-2 border-[#8B5CF6] rounded-xl overflow-hidden">
+                            {/* Header */}
                             <div className="flex items-center justify-between px-4 py-3 bg-[#8B5CF6]/5 border-b border-[#8B5CF6]/20">
                               <div>
                                 <p className="text-sm font-bold text-[#111]">Historial de {c.name}</p>
@@ -1795,38 +1796,36 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                             {/* Timeline */}
                             <div className="px-4 py-4 bg-white">
                               <div className="relative border-l-2 border-[#E5E5E5] pl-6 space-y-3">
-                                {/* Estado actual */}
+
+                                {/* Evento 1: Canjes alcanzados */}
                                 <div className="relative">
-                                  <span className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white shadow ${
-                                    !c.is_active ? 'bg-[#999]' : c.isExpiringSoon ? 'bg-amber-400' : 'bg-[#16A34A]'
-                                  }`} />
+                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#8B5CF6] border-2 border-white shadow" />
                                   <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
                                     <div className="flex items-center justify-between gap-2">
-                                      <p className="text-xs font-bold text-[#111]">Estado actual</p>
-                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge.badge}`}>
-                                        {statusBadge.label}
-                                      </span>
+                                      <p className="text-xs font-bold text-[#111]">100 canjes alcanzados</p>
+                                      <span className="text-[10px] font-bold text-[#8B5CF6]">Hito</span>
                                     </div>
-                                    <p className="text-[10px] text-[#999] mt-1">Ahora</p>
+                                    <p className="text-[10px] text-[#666] mt-0.5">Hito de redenciones</p>
+                                    <p className="text-[10px] text-[#666] mt-0.5">Canje promedio: $12.500</p>
+                                    <p className="text-[10px] text-[#999] mt-1">15/04/2026</p>
                                   </div>
                                 </div>
 
-                                {/* Upgrade de plan */}
-                                {c.plan === 'premium' && (
-                                  <div className="relative">
-                                    <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#8B5CF6] border-2 border-white shadow" />
-                                    <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <p className="text-xs font-bold text-[#111]">Upgrade de plan</p>
-                                        <span className="text-[10px] font-bold text-[#8B5CF6]">Basic → Premium</span>
-                                      </div>
-                                      <p className="text-[10px] text-[#666] mt-0.5">+$40.000/mes de ingresos</p>
-                                      <p className="text-[10px] text-[#999] mt-1">15/03/2026</p>
+                                {/* Evento 2: Productos agregados */}
+                                <div className="relative">
+                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#0EA5E9] border-2 border-white shadow" />
+                                  <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-bold text-[#111]">20 productos agregados</p>
+                                      <span className="text-[10px] font-bold text-[#0EA5E9]">Catálogo</span>
                                     </div>
+                                    <p className="text-[10px] text-[#666] mt-0.5">Actualización de catálogo</p>
+                                    <p className="text-[10px] text-[#666] mt-0.5">Total productos: {c.products_count ?? 0}</p>
+                                    <p className="text-[10px] text-[#999] mt-1">01/03/2026</p>
                                   </div>
-                                )}
+                                </div>
 
-                                {/* Pago recibido */}
+                                {/* Evento 3: Pago recibido */}
                                 <div className="relative">
                                   <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white shadow" />
                                   <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
@@ -1839,40 +1838,46 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                                     <p className="text-[10px] text-[#666] mt-0.5">
                                       Plan {COMERCIO_PLANS[c.plan]?.label ?? 'Basic'} — Renovación mensual
                                     </p>
-                                    <p className="text-[10px] text-[#999] mt-1">01/05/2026</p>
+                                    <p className="text-[10px] text-[#999] mt-1">01/02/2026</p>
                                   </div>
                                 </div>
 
-                                {/* Inscripción */}
+                                {/* Evento 4: Inscripción inicial */}
                                 <div className="relative">
-                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-[#0EA5E9] border-2 border-white shadow" />
+                                  <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-orange-400 border-2 border-white shadow" />
                                   <div className="bg-[#F5F5F5] rounded-lg px-3 py-2.5">
                                     <div className="flex items-center justify-between gap-2">
                                       <p className="text-xs font-bold text-[#111]">Inscripción inicial</p>
-                                      <span className="text-[10px] text-[#666]">Plan Basic</span>
+                                      <span className="text-[10px] text-[#666]">Nuevo comercio</span>
                                     </div>
-                                    <p className="text-[10px] text-[#666] mt-0.5 capitalize">{c.category ?? 'Comercio'}</p>
+                                    <p className="text-[10px] text-[#666] mt-0.5 capitalize">
+                                      Categoría: {c.category ?? 'otro'}
+                                    </p>
+                                    <p className="text-[10px] text-[#666] mt-0.5">
+                                      Plan {COMERCIO_PLANS[c.plan]?.label ?? 'Basic'} contratado
+                                    </p>
                                     <p className="text-[10px] text-[#999] mt-1">
                                       {new Date(c.created_at ?? Date.now()).toLocaleDateString('es-CL')}
                                     </p>
                                   </div>
                                 </div>
+
                               </div>
                             </div>
 
                             {/* Footer summary */}
                             <div className="grid grid-cols-3 divide-x divide-[#E5E5E5] border-t border-[#E5E5E5]">
                               <div className="py-3 text-center">
-                                <p className="text-base font-bold text-[#16A34A]">12</p>
-                                <p className="text-[10px] text-[#666] mt-0.5">Pagos</p>
+                                <p className="text-base font-bold text-[#8B5CF6]">{c.canjes_total ?? 0}</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Canjes</p>
                               </div>
                               <div className="py-3 text-center">
-                                <p className="text-base font-bold text-[#CC0000]">1</p>
-                                <p className="text-[10px] text-[#666] mt-0.5">Atrasos</p>
+                                <p className="text-base font-bold text-[#0EA5E9]">{c.products_count ?? 0}</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Productos</p>
                               </div>
                               <div className="py-3 text-center">
-                                <p className="text-base font-bold text-[#8B5CF6]">2</p>
-                                <p className="text-[10px] text-[#666] mt-0.5">Cambios</p>
+                                <p className="text-base font-bold text-[#16A34A]">{c.coupons_count ?? 0}</p>
+                                <p className="text-[10px] text-[#666] mt-0.5">Cupones</p>
                               </div>
                             </div>
                           </div>
@@ -2066,7 +2071,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E5E5]">
               <div>
                 <h2 className="font-bold text-[#111] text-base">
-                  {editingComercio ? 'Editar Comercio' : 'Agregar Nuevo Comercio'}
+                  {editingComercio ? '✏️ Editar Comercio' : '+ Agregar Nuevo Comercio'}
                 </h2>
                 <p className="text-[11px] text-[#666] mt-0.5">
                   {editingComercio ? 'Actualiza los datos del comercio registrado' : 'Completa los campos para registrar el comercio'}
@@ -2118,7 +2123,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                   type="text"
                   value={newComercio.address}
                   onChange={e => setNewComercio(f => ({ ...f, address: e.target.value }))}
-                  placeholder="Calle 123, Ciudad"
+                  placeholder="Av. Providencia 1234, Providencia"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
                 />
               </div>
