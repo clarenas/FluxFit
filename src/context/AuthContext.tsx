@@ -8,7 +8,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isGuest: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string, rut?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   enterAsGuest: () => void;
@@ -105,13 +105,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, rut?: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     if (data.user) {
       const profile = await waitForProfile(data.user.id);
       if (profile && fullName) {
-        await supabase.from('users').update({ full_name: fullName }).eq('id', data.user.id);
+        const updates: Record<string, string | null> = { full_name: fullName };
+        if (rut !== undefined) updates.rut = rut || null;
+        await supabase.from('users').update(updates).eq('id', data.user.id);
         setUser({ ...profile, full_name: fullName });
       } else {
         setUser(profile);

@@ -30,6 +30,7 @@ export function AuthPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [rut, setRut] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
@@ -348,7 +349,8 @@ export function AuthPage() {
           onSubmit={async (e) => {
             e.preventDefault(); setError(''); setSubmitting(true);
             try {
-              await signUp(email, password, fullName);
+              await signUp(email, password, fullName, rut.trim() || undefined);
+              setRut('');
               navigate('/home');
             } catch (err: any) {
               setError(err.message || 'Error al crear cuenta');
@@ -359,6 +361,18 @@ export function AuthPage() {
           <div>
             <label className={labelClass}>Nombre completo</label>
             <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClass} placeholder="Tu nombre" required />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[#111] mb-1.5">RUT (opcional)</label>
+            <input
+              type="text"
+              value={rut}
+              onChange={e => setRut(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:border-[#CC0000] bg-white text-[#111]"
+              placeholder="12.345.678-9"
+              maxLength={12}
+            />
+            <p className="text-xs text-[#666] mt-1">Formato: 12.345.678-9</p>
           </div>
           <div>
             <label className={labelClass}>Email</label>
