@@ -396,7 +396,9 @@ export function SensorInventoryPage() {
               <select value={regForm.branch_id} onChange={e => setRegForm(f => ({ ...f, branch_id: e.target.value }))} className={inp}>
                 <option value="">— Seleccionar sucursal —</option>
                 {branches.map(b => (
-                  <option key={b.id} value={b.id}>{b.gyms?.name ?? '(Sin cadena)'} — {b.name}</option>
+                  <option key={b.id} value={b.id}>
+                    {b.gyms?.name || 'Gimnasio independiente'} - {b.name}
+                  </option>
                 ))}
               </select>
               {regErrors.branch_id && <p className="text-xs text-[#CC0000] mt-1">{regErrors.branch_id}</p>}
