@@ -226,7 +226,7 @@ export function SensorInventoryPage() {
       // Create the kit
       const { data: newKit, error: kitErr } = await supabase
         .from('sensor_kits')
-        .insert({ branch_id: regForm.branch_id, name: regForm.kit_name.trim() })
+        .insert({ branch_id: regForm.branch_id, name: regForm.kit_name.trim(), activation_date: regForm.activation_date || null, status: regForm.status, observations: regForm.observations.trim() || null })
         .select('id')
         .single();
       if (kitErr) throw kitErr;
@@ -438,6 +438,28 @@ export function SensorInventoryPage() {
               />
               {regErrors.kit_name && <p className="text-xs text-[#CC0000] mt-1">{regErrors.kit_name}</p>}
             </div>
+            <div>
+              <label className="block text-xs font-bold text-[#111] mb-1.5">Fecha de activación</label>
+              <input
+                type="date"
+                value={regForm.activation_date}
+                onChange={e => setRegForm(f => ({ ...f, activation_date: e.target.value }))}
+                className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:border-[#CC0000] bg-white text-[#111]"
+              />
+              <p className="text-xs text-[#666] mt-1">Fecha en que el sensor se puso en funcionamiento</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#111] mb-1.5">Estado del sensor</label>
+              <select
+                value={regForm.status}
+                onChange={e => setRegForm(f => ({ ...f, status: e.target.value }))}
+                className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:border-[#CC0000] bg-white text-[#111]"
+              >
+                <option value="operativo">🟢 Operativo</option>
+                <option value="mantencion">🟡 En mantención</option>
+                <option value="baja">🔴 De baja</option>
+              </select>
+            </div>
           </div>
 
           {/* Step 2: Hardware */}
@@ -492,6 +514,19 @@ export function SensorInventoryPage() {
                 {regErrors.sn_exit && <p className="text-xs text-[#CC0000] mt-1">{regErrors.sn_exit}</p>}
               </div>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#111] mb-1.5">Observaciones (opcional)</label>
+            <textarea
+              value={regForm.observations}
+              onChange={e => setRegForm(f => ({ ...f, observations: e.target.value }))}
+              placeholder="Notas sobre instalación, problemas, configuración especial, etc."
+              rows={3}
+              maxLength={500}
+              className="w-full px-3 py-2.5 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:border-[#CC0000] bg-white text-[#111] resize-none"
+            />
+            <p className="text-xs text-[#666] mt-1">Máximo 500 caracteres</p>
           </div>
 
           {(() => {
