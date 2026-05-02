@@ -375,10 +375,24 @@ export function SensorInventoryPage() {
 
   const toggleKitStatus = async (kit: SensorKit) => {
     const next = kit.status === 'operativo' ? 'mantencion' : 'operativo';
+    const label = next === 'operativo' ? 'Operativo' : 'En mantención';
+    if (!confirm(`¿Cambiar estado del kit a "${label}"?`)) return;
     const { error } = await supabase.from('sensor_kits').update({ status: next }).eq('id', kit.id);
     if (error) { showToast('Error al actualizar estado', 'error'); return; }
     await fetchData();
-    showToast(`Kit marcado como ${next}`, 'success');
+    showToast(`Kit marcado como ${label}`, 'success');
+  };
+
+  const saveEditingKit = async () => {
+    if (!editingKit) return;
+    const { error } = await supabase
+      .from('sensor_kits')
+      .update({ status: editingKit.status, observations: editingKit.observations?.trim() || null })
+      .eq('id', editingKit.id);
+    if (error) { showToast('Error al guardar', 'error'); return; }
+    setEditingKit(null);
+    await fetchData();
+    showToast('Kit actualizado correctamente', 'success');
   };
 
   const setKitBaja = async (kit: SensorKit) => {
@@ -1111,6 +1125,61 @@ export function SensorInventoryPage() {
           );
         })}
       </div>
+
+    {/* Edit kit modal */}
+    {editingKit && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="px-6 pt-5 pb-4 border-b border-[#E5E5E5]">
+            <h2 className="font-bold text-[#111] text-base">✏️ Editar Estado del Kit</h2>
+            <p className="text-xs text-[#666] mt-0.5">
+              {editingKit.branch?.gym?.name ?? editingKit.gym_branches?.gyms?.name ?? '—'} — {editingKit.branch?.name ?? editingKit.gym_branches?.name ?? '—'}
+            </p>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-[#444] mb-1.5">Estado</label>
+              <select
+                value={editingKit.status ?? 'operativo'}
+                onChange={e => setEditingKit((k: any) => ({ ...k, status: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors"
+              >
+                <option value="operativo">🟢 Operativo</option>
+                <option value="mantencion">🟡 En mantención</option>
+                <option value="baja">🔴 De baja</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#444] mb-1.5">Observaciones</label>
+              <textarea
+                rows={4}
+                value={editingKit.observations ?? ''}
+                onChange={e => setEditingKit((k: any) => ({ ...k, observations: e.target.value }))}
+                placeholder="Motivo del cambio, detalles técnicos, etc."
+                className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#F9F9F9] text-sm text-[#111] focus:outline-none focus:border-[#CC0000] focus:bg-white transition-colors resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="px-6 pb-5 flex gap-3">
+            <button
+              onClick={() => setEditingKit(null)}
+              className="flex-1 py-2.5 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-lg hover:bg-[#F5F5F5] active:scale-[0.98] transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={saveEditingKit}
+              className="flex-1 py-2.5 bg-[#CC0000] text-white text-sm font-bold rounded-lg hover:bg-[#A00000] active:scale-[0.98] transition-all"
+            >
+              Guardar cambios
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
