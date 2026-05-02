@@ -31,6 +31,10 @@ interface SensorKit {
   branch_id: string;
   name: string;
   created_at: string;
+  activation_date?: string | null;
+  status?: string | null;
+  observations?: string | null;
+  branch?: { name: string; gym_id: string; gym: { name: string } | null } | null;
   gym_branches?: {
     id: string;
     name: string;
@@ -154,6 +158,8 @@ export function SensorInventoryPage() {
   const [replaceTarget, setReplaceTarget] = useState<{ kit: SensorKit; sensor: Sensor; position: 'entry' | 'exit' } | null>(null);
   const [replaceForm, setReplaceForm] = useState({ serial_number: '', brand: '', model: '', reason: 'replaced' as string });
   const [replaceErrors, setReplaceErrors] = useState<Record<string, string>>({});
+  const [selectedKitHistory, setSelectedKitHistory] = useState<string | null>(null);
+  const [editingKit, setEditingKit] = useState<any>(null);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -163,7 +169,8 @@ export function SensorInventoryPage() {
       supabase
         .from('sensor_kits')
         .select(`
-          id, branch_id, name, created_at,
+          id, branch_id, name, created_at, activation_date, status, observations,
+          branch:gym_branches(name, gym_id, gym:gyms(name)),
           gym_branches ( id, name, gyms ( id, name ) ),
           sensors ( id, kit_id, branch_id, position, label, brand, model, serial_number, installation_date, status, last_heartbeat, secret_key, created_at )
         `)
@@ -364,6 +371,22 @@ export function SensorInventoryPage() {
     await supabase.from('sensor_kits').delete().eq('id', kitId);
     await fetchData();
     showToast('Kit eliminado', 'info');
+  };
+
+  const toggleKitStatus = async (kit: SensorKit) => {
+    const next = kit.status === 'operativo' ? 'mantencion' : 'operativo';
+    const { error } = await supabase.from('sensor_kits').update({ status: next }).eq('id', kit.id);
+    if (error) { showToast('Error al actualizar estado', 'error'); return; }
+    await fetchData();
+    showToast(`Kit marcado como ${next}`, 'success');
+  };
+
+  const setKitBaja = async (kit: SensorKit) => {
+    if (!confirm('¿Dar de baja este kit? Quedará desactivado.')) return;
+    const { error } = await supabase.from('sensor_kits').update({ status: 'baja' }).eq('id', kit.id);
+    if (error) { showToast('Error al actualizar estado', 'error'); return; }
+    await fetchData();
+    showToast('Kit dado de baja', 'info');
   };
 
   // ── Derived stats ──────────────────────────────────────────────────────────
@@ -788,59 +811,108 @@ export function SensorInventoryPage() {
         {!loading && kits.map(kit => {
           const entrySensor = kit.sensors?.find(s => s.position === 'entry');
           const exitSensor = kit.sensors?.find(s => s.position === 'exit');
-          const gymName = kit.gym_branches?.gyms?.name ?? '—';
-          const branchName = kit.gym_branches?.name ?? '—';
+          const gymName = kit.branch?.gym?.name ?? kit.gym_branches?.gyms?.name ?? '—';
+          const branchName = kit.branch?.name ?? kit.gym_branches?.name ?? '—';
           const isExpanded = expandedKit === kit.id;
+          const kitStatus = kit.status ?? 'operativo';
 
-          const kitOnline = [entrySensor, exitSensor].filter(Boolean).every(s => s && isOnline(s.last_heartbeat) && s.status !== 'retired');
-          const kitPartial = [entrySensor, exitSensor].some(s => s && isOnline(s.last_heartbeat) && s?.status !== 'retired');
-          const kitBadgeColor = kitOnline ? 'bg-[#16A34A]/10 text-[#16A34A] border-[#16A34A]/20'
-            : kitPartial ? 'bg-amber-50 text-amber-700 border-amber-200'
-            : 'bg-[#CC0000]/5 text-[#CC0000] border-[#CC0000]/20';
-          const kitBadgeLabel = kitOnline ? 'Par activo' : kitPartial ? 'Parcial' : 'Sin señal';
+          const statusBadge =
+            kitStatus === 'operativo'  ? { label: 'OPERATIVO',     cls: 'bg-green-100 text-green-700' }
+            : kitStatus === 'mantencion' ? { label: 'EN MANTENCIÓN', cls: 'bg-yellow-100 text-yellow-700' }
+            : { label: 'DE BAJA', cls: 'bg-red-100 text-red-700' };
 
           return (
-            <div key={kit.id} className="bg-white rounded-2xl border border-[#E5E5E5] overflow-hidden shadow-sm">
-              {/* Kit header */}
+            <div key={kit.id} className={`bg-white rounded-2xl border border-[#E5E5E5] overflow-hidden shadow-sm transition-opacity ${kitStatus === 'baja' ? 'opacity-70' : ''}`}>
+
+              {/* Card body */}
+              <div className="p-5">
+                {/* Gym name + status badge */}
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <p className="font-bold text-[#111] text-sm">🏋️ {gymName}</p>
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${statusBadge.cls}`}>
+                    {statusBadge.label}
+                  </span>
+                </div>
+
+                <p className="text-xs text-[#666] mb-0.5">📍 Sucursal: {branchName}</p>
+                <p className="text-xs text-[#888]">Kit: {kit.name}</p>
+
+                {/* Info grid */}
+                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                  {entrySensor && (
+                    <div>
+                      <p className="text-[#999] font-medium">Marca / Modelo</p>
+                      <p className="font-bold text-[#111]">{entrySensor.brand} {entrySensor.model}</p>
+                    </div>
+                  )}
+                  {kit.activation_date && (
+                    <div>
+                      <p className="text-[#999] font-medium">Fecha activación</p>
+                      <p className="font-bold text-[#111]">
+                        {new Date(kit.activation_date).toLocaleDateString('es-CL')}
+                      </p>
+                    </div>
+                  )}
+                  {entrySensor && (
+                    <div>
+                      <p className="text-[#999] font-medium">Serie Entrada</p>
+                      <p className="font-mono font-bold text-[#444]">{entrySensor.serial_number || '—'}</p>
+                    </div>
+                  )}
+                  {exitSensor && (
+                    <div>
+                      <p className="text-[#999] font-medium">Serie Salida</p>
+                      <p className="font-mono font-bold text-[#444]">{exitSensor.serial_number || '—'}</p>
+                    </div>
+                  )}
+                  {kit.observations && (
+                    <div className="col-span-2">
+                      <p className="text-[#999] font-medium">Observaciones</p>
+                      <p className="italic text-[#555]">{kit.observations}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedKitHistory(selectedKitHistory === kit.id ? null : kit.id)}
+                    className="flex-1 min-w-[45%] py-1.5 text-xs font-bold rounded-xl border border-[#8B5CF6]/40 text-[#8B5CF6] hover:bg-[#8B5CF6]/5 active:scale-[0.98] transition-all"
+                  >
+                    📜 Ver historial
+                  </button>
+                  <button
+                    onClick={() => setEditingKit(editingKit?.id === kit.id ? null : kit)}
+                    className="flex-1 min-w-[45%] py-1.5 text-xs font-bold rounded-xl border border-[#E5E5E5] text-[#555] hover:bg-[#F5F5F5] active:scale-[0.98] transition-all"
+                  >
+                    ✏️ Editar estado
+                  </button>
+                  <button
+                    onClick={() => toggleKitStatus(kit)}
+                    className="flex-1 min-w-[45%] py-1.5 text-xs font-bold rounded-xl border border-[#0EA5E9]/40 text-[#0EA5E9] hover:bg-[#0EA5E9]/5 active:scale-[0.98] transition-all"
+                  >
+                    🔄 Cambiar estado
+                  </button>
+                  {kitStatus !== 'baja' && (
+                    <button
+                      onClick={() => setKitBaja(kit)}
+                      className="flex-1 min-w-[45%] py-1.5 text-xs font-bold rounded-xl border border-[#CC0000]/40 text-[#CC0000] hover:bg-[#CC0000]/5 active:scale-[0.98] transition-all"
+                    >
+                      🔴 Dar de baja
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Expand sensor detail toggle */}
               <button
-                className="w-full p-4 text-left"
+                className="w-full px-5 py-2.5 bg-[#FAFAFA] border-t border-[#F0F0F0] text-[11px] font-bold text-[#888] flex items-center justify-center gap-1 hover:bg-[#F5F5F5] transition-colors"
                 onClick={() => setExpandedKit(isExpanded ? null : kit.id)}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    {/* Breadcrumb */}
-                    <div className="flex items-center gap-1 flex-wrap mb-1">
-                      <span className="text-[10px] font-bold text-[#CC0000] uppercase tracking-wide">{gymName}</span>
-                      <span className="text-[10px] text-[#CCC]">›</span>
-                      <span className="text-[10px] text-[#666]">{branchName}</span>
-                    </div>
-                    <p className="font-bold text-[#111] text-sm">{kit.name}</p>
-                    <p className="text-[10px] text-[#999] mt-0.5">
-                      Registrado {fmtDate(kit.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${kitBadgeColor}`}>
-                      {kitBadgeLabel}
-                    </span>
-                    {isExpanded ? <ChevronUp size={14} className="text-[#999]" /> : <ChevronDown size={14} className="text-[#999]" />}
-                  </div>
-                </div>
-
-                {/* Sensor pair preview */}
-                <div className="flex gap-2 mt-3">
-                  <div className="flex-1">
-                    <p className="text-[9px] font-bold text-[#999] uppercase mb-1">Entrada</p>
-                    <SensorPill sensor={entrySensor} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[9px] font-bold text-[#999] uppercase mb-1">Salida</p>
-                    <SensorPill sensor={exitSensor} />
-                  </div>
-                </div>
+                {isExpanded ? <><ChevronUp size={12} /> Ocultar sensores</> : <><ChevronDown size={12} /> Ver sensores</>}
               </button>
 
-              {/* Expanded detail */}
+              {/* Expanded sensor detail */}
               {isExpanded && (
                 <div className="border-t border-[#F5F5F5] p-4 space-y-4 bg-[#FAFAFA]">
                   {([['entry', 'Entrada', entrySensor], ['exit', 'Salida', exitSensor]] as const).map(([pos, posLabel, sensor]) => (

@@ -83,6 +83,8 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [requestFilter, setRequestFilter] = useState('all');
   const [messageFilter, setMessageFilter] = useState('todos');
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
+  const [gestionSubTab, setGestionSubTab] = useState('gyms');
+  const [showGestionSubmenu, setShowGestionSubmenu] = useState(false);
 
   const { toast, showToast } = useToast();
 
@@ -452,47 +454,111 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
   const pendingCount = pendingGyms.length + pendingCommerces.length;
 
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'gyms', label: 'Gyms' },
-    { id: 'solicitudes', label: 'Solicitudes' },
-    { id: 'pendientes', label: pendingCount > 0 ? `Pendientes (${pendingCount})` : 'Pendientes' },
-    { id: 'impacto', label: 'Impacto' },
-    { id: 'socios', label: 'Socios' },
-    { id: 'mensajes', label: 'Mensajes' },
-    { id: 'comercios', label: 'Comercios' },
+  const navItems = [
+    { id: 'dashboard',   label: 'Dashboard',    icon: '📊' },
+    { id: 'gestion',     label: 'Gestión',       icon: '🏢' },
+    { id: 'sensores',    label: 'Sensores',      icon: '📡' },
+    { id: 'solicitudes', label: 'Solicitudes',   icon: '📋' },
+    { id: 'mensajes',    label: 'Mensajes',      icon: '✉️' },
+    { id: 'pendientes',  label: 'Pendientes',    icon: '⏳' },
+    { id: 'impacto',     label: 'Impacto',       icon: '📈' },
+    { id: 'config',      label: 'Config',        icon: '⚙️' },
   ];
 
-  const tabClass = (id: string) =>
-    `flex-shrink-0 px-4 py-2.5 text-sm font-bold rounded-full transition-colors ${
-      activeTab === id ? 'bg-[#CC0000] text-white' : 'bg-white text-[#666] border border-[#E5E5E5]'
-    }`;
+  const handleNavClick = (id: string) => {
+    if (id === 'gestion') {
+      setActiveTab('gestion');
+      setShowGestionSubmenu(true);
+    } else {
+      setActiveTab(id);
+      setShowGestionSubmenu(false);
+    }
+  };
+
+  const resolvedTab = activeTab === 'gestion' ? gestionSubTab : activeTab;
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]">
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }} className="bg-[#F5F5F5]">
       <Toast {...toast} />
-      {/* Header */}
-      <div className="bg-white border-b border-[#E5E5E5] px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate('/profile')} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F5F5F5] transition-colors">
-          <ArrowLeft size={20} className="text-[#111111]" />
-        </button>
-        <h1 className="font-bold text-[#111111] text-lg flex-1">Panel Admin</h1>
-        <Shield size={22} className="text-[#CC0000]" />
-      </div>
 
-      {/* Tabs */}
-      <div className="bg-white border-b border-[#E5E5E5] px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide">
-        {tabs.map(t => (
-          <button key={t.id} className={tabClass(t.id)} onClick={() => setActiveTab(t.id)}>
-            {t.label}
+      {/* Left sidebar */}
+      <aside style={{ width: 200, flexShrink: 0 }} className="bg-white border-r border-[#E5E5E5] flex flex-col overflow-y-auto">
+        {/* Logo area */}
+        <div className="px-4 pt-5 pb-4 border-b border-[#F0F0F0]">
+          <p style={{ color: '#CC0000', fontWeight: 500, fontSize: 18 }}>FLUXFIT</p>
+          <p style={{ fontSize: 12 }} className="text-[#999] mt-0.5">Panel Admin</p>
+        </div>
+
+        {/* Nav items */}
+        <nav className="flex-1 py-2">
+          {navItems.map(item => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item.id)}
+                style={{ fontSize: 14, padding: '0.625rem 1rem' }}
+                className={`w-full text-left flex items-center gap-2.5 transition-colors ${
+                  isActive ? 'bg-[#CC0000] text-white' : 'text-[#111] hover:bg-[#F5F5F5]'
+                }`}
+              >
+                <span style={{ fontSize: 16 }}>{item.icon}</span>
+                <span className="font-medium">{item.label}</span>
+                {item.id === 'gestion' && (
+                  <span className={`ml-auto text-xs transition-transform ${isActive ? 'rotate-180' : ''}`}>▼</span>
+                )}
+                {item.id === 'pendientes' && pendingCount > 0 && (
+                  <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/30 text-white' : 'bg-[#CC0000] text-white'}`}>
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Back button */}
+        <div className="p-3 border-t border-[#F0F0F0]">
+          <button
+            onClick={() => navigate('/profile')}
+            style={{ fontSize: 13 }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[#666] hover:bg-[#F5F5F5] transition-colors"
+          >
+            <ArrowLeft size={14} />
+            <span>Volver</span>
           </button>
-        ))}
-      </div>
+        </div>
+      </aside>
 
-      <div className="px-4 py-4 max-w-[900px] mx-auto">
+      {/* Main content */}
+      <main style={{ flex: 1, overflow: 'auto' }} className="bg-[#F5F5F5]">
+        {/* Gestión sub-tabs */}
+        {showGestionSubmenu && (
+          <div className="bg-white border-b border-[#E5E5E5] px-4 py-2 flex gap-2">
+            {[
+              { id: 'gyms', label: 'Gyms' },
+              { id: 'socios', label: 'Socios' },
+              { id: 'comercios', label: 'Comercios' },
+            ].map(sub => (
+              <button
+                key={sub.id}
+                onClick={() => setGestionSubTab(sub.id)}
+                className={`px-4 py-1.5 text-sm font-bold rounded-full transition-colors ${
+                  gestionSubTab === sub.id
+                    ? 'bg-[#CC0000] text-white'
+                    : 'bg-white border border-[#E5E5E5] text-[#666] hover:border-[#CC0000] hover:text-[#CC0000]'
+                }`}
+              >
+                {sub.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="px-4 py-4 max-w-[900px] mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-[#666]">Cargando...</div>
-        ) : activeTab === 'dashboard' ? (
+        ) : resolvedTab === 'dashboard' ? (
           <div className="space-y-4">
             {/* Month selector */}
             <div className="flex items-center justify-between bg-white rounded-2xl border border-[#E5E5E5] px-4 py-3">
@@ -633,7 +699,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
               </div>
             </div>
           </div>
-        ) : activeTab === 'gyms' ? (
+        ) : resolvedTab === 'gyms' ? (
           <div className="space-y-4">
             {/* Search + add */}
             <div className="flex gap-2">
@@ -1028,7 +1094,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
               );
             })()}
           </div>
-        ) : activeTab === 'solicitudes' ? (
+        ) : resolvedTab === 'solicitudes' ? (
           <div className="space-y-4">
             {/* Filter chips */}
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1098,7 +1164,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             })()}
           </div>
 
-        ) : activeTab === 'socios' ? (
+        ) : resolvedTab === 'socios' ? (
           <div className="space-y-4">
             {/* Search */}
             <input
@@ -1379,7 +1445,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             })()}
           </div>
 
-        ) : activeTab === 'mensajes' ? (
+        ) : resolvedTab === 'mensajes' ? (
           <div className="space-y-4">
             {/* Filter chips */}
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1443,7 +1509,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             })()}
           </div>
 
-        ) : activeTab === 'pendientes' ? (
+        ) : resolvedTab === 'pendientes' ? (
           <div className="space-y-4">
             {pendingCount === 0 && (
               <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-sm text-[#666]">
@@ -1514,7 +1580,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             )}
           </div>
 
-        ) : activeTab === 'impacto' ? (
+        ) : resolvedTab === 'impacto' ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-[#CC0000] rounded-xl p-4 text-center col-span-2">
@@ -1564,7 +1630,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             )}
           </div>
 
-        ) : activeTab === 'comercios' ? (
+        ) : resolvedTab === 'comercios' ? (
           <div className="space-y-4">
             {(() => {
               const now = Date.now();
@@ -1893,6 +1959,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
         ) : null}
 
       </div>
+      </main>
 
       {/* Approval Modal */}
       {approvingRequest && (
