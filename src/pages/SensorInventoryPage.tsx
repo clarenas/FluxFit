@@ -822,7 +822,8 @@ export function SensorInventoryPage() {
             : { label: 'DE BAJA', cls: 'bg-red-100 text-red-700' };
 
           return (
-            <div key={kit.id} className={`bg-white rounded-2xl border border-[#E5E5E5] overflow-hidden shadow-sm transition-opacity ${kitStatus === 'baja' ? 'opacity-70' : ''}`}>
+            <div key={kit.id}>
+            <div className={`bg-white rounded-2xl border border-[#E5E5E5] overflow-hidden shadow-sm transition-opacity ${kitStatus === 'baja' ? 'opacity-70' : ''}`}>
 
               {/* Card body */}
               <div className="p-5">
@@ -985,6 +986,127 @@ export function SensorInventoryPage() {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* Kit history panel */}
+            {selectedKitHistory === kit.id && (() => {
+              const circleColor =
+                kitStatus === 'operativo'  ? 'bg-green-500'
+                : kitStatus === 'mantencion' ? 'bg-yellow-400'
+                : 'bg-red-500';
+              const statusEmoji =
+                kitStatus === 'operativo'  ? '🟢 Operativo'
+                : kitStatus === 'mantencion' ? '🟡 En mantención'
+                : '🔴 De baja';
+              const daysOp = kit.activation_date
+                ? Math.floor((Date.now() - new Date(kit.activation_date).getTime()) / 86400000)
+                : null;
+
+              return (
+                <div className="mt-2 rounded-2xl border-2 border-[#8B5CF6]/50 bg-white overflow-hidden shadow-sm">
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-[#8B5CF6]/5 border-b border-[#8B5CF6]/20">
+                    <div>
+                      <p className="text-sm font-bold text-[#111]">📜 Historial del Kit</p>
+                      <p className="text-[11px] text-[#666] mt-0.5">{gymName} — {branchName}</p>
+                      <p className="text-[10px] text-[#888] font-mono mt-0.5">
+                        SN Entrada: {entrySensor?.serial_number || '—'} | SN Salida: {exitSensor?.serial_number || '—'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedKitHistory(null)}
+                      className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#8B5CF6]/10 text-[#8B5CF6] transition-colors flex-shrink-0"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+
+                  {/* Timeline */}
+                  <div className="px-4 py-4">
+                    <div className="relative pl-6 space-y-3 before:content-[''] before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-px before:bg-[#E5E5E5]">
+
+                      {/* Event 1 — current status */}
+                      <div className="relative">
+                        <span className={`absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white shadow ${circleColor}`} />
+                        <div className="bg-[#F5F5F5] rounded-xl px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-[#111]">📍 Estado actual</p>
+                            <span className="text-[10px] text-[#999]">Ahora</span>
+                          </div>
+                          <p className="text-[11px] text-[#555] mt-1">{statusEmoji}</p>
+                          {kit.observations && (
+                            <p className="text-[10px] italic text-[#777] mt-1">{kit.observations}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Event 2 — activation */}
+                      <div className="relative">
+                        <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white shadow bg-[#0EA5E9]" />
+                        <div className="bg-[#F5F5F5] rounded-xl px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-[#111]">⚡ Activación inicial</p>
+                            <span className="text-[10px] text-[#999]">
+                              {kit.activation_date
+                                ? new Date(kit.activation_date).toLocaleDateString('es-CL')
+                                : 'Fecha no especificada'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#555] mt-1">Kit instalado y puesto en funcionamiento</p>
+                          {entrySensor && (
+                            <p className="text-[10px] text-[#888] mt-0.5">{entrySensor.brand} {entrySensor.model}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Event 3 — system registration */}
+                      <div className="relative">
+                        <span className="absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white shadow bg-[#8B5CF6]" />
+                        <div className="bg-[#F5F5F5] rounded-xl px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-[#111]">📝 Registro en sistema</p>
+                            <span className="text-[10px] text-[#999]">
+                              {new Date(kit.created_at).toLocaleDateString('es-CL')}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#555] mt-1">Kit agregado al inventario FluxFit</p>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Footer summary */}
+                    <div className="mt-4 grid grid-cols-2 divide-x divide-[#E5E5E5] border border-[#E5E5E5] rounded-xl overflow-hidden">
+                      <div className="py-3 px-3">
+                        <p className="text-[10px] text-[#999] font-medium">Días en operación</p>
+                        <p className="text-sm font-bold text-[#111] mt-0.5">
+                          {daysOp !== null ? `${daysOp} días` : '—'}
+                        </p>
+                      </div>
+                      <div className="py-3 px-3">
+                        <p className="text-[10px] text-[#999] font-medium">Estado actual</p>
+                        <p className="text-sm font-bold text-[#111] mt-0.5">{statusEmoji}</p>
+                      </div>
+                    </div>
+
+                    {/* Edit observation button */}
+                    <button
+                      onClick={async () => {
+                        const obs = window.prompt('Observación del kit:', kit.observations ?? '');
+                        if (obs === null) return;
+                        const { error } = await supabase.from('sensor_kits').update({ observations: obs.trim() || null }).eq('id', kit.id);
+                        if (error) { showToast('Error al guardar', 'error'); return; }
+                        await fetchData();
+                        showToast('Observación guardada', 'success');
+                      }}
+                      className="mt-3 w-full py-2 text-xs font-bold rounded-xl border border-[#8B5CF6]/40 text-[#8B5CF6] hover:bg-[#8B5CF6]/5 active:scale-[0.98] transition-all"
+                    >
+                      📝 Agregar / Editar observación
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
             </div>
           );
         })}
