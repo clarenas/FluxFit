@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Cpu, Wifi, WifiOff, Wrench, Plus, X, RefreshCw,
+  Cpu, Plus, X, RefreshCw,
   ChevronDown, ChevronUp, AlertTriangle, Clock, History,
   ArrowRightLeft, CheckCircle, Radio,
 } from 'lucide-react';
@@ -187,8 +188,8 @@ export function SensorInventoryPage() {
         .order('retired_at', { ascending: false })
         .limit(100),
     ]);
-    setKits(kitsRes.data ?? []);
-    setBranches(branchesRes.data ?? []);
+    setKits((kitsRes.data ?? []) as unknown as SensorKit[]);
+    setBranches((branchesRes.data ?? []) as unknown as Branch[]);
     setGyms(gymsRes.data ?? []);
     setHistory(histRes.data ?? []);
     setLoading(false);

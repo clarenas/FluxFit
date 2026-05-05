@@ -83,3 +83,22 @@ export function timeAgo(dateStr: string | null): string {
 export function getInitials(name: string): string {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
+
+type RoleBadge = { label: string; className: string };
+
+export function getRoleBadge(role: string | null | undefined): RoleBadge {
+  switch (role) {
+    case 'fluxfit_admin':
+      return { label: 'Admin FluxFit', className: 'bg-red-100 text-red-800' };
+    case 'gym_admin':
+      return { label: 'Gimnasio', className: 'bg-green-100 text-green-800' };
+    case 'commerce_admin':
+      return { label: 'Comercio', className: 'bg-purple-100 text-purple-800' };
+    case 'gym_pending':
+      return { label: 'Gym (Pendiente Aprobación)', className: 'bg-yellow-100 text-yellow-800' };
+    case 'commerce_pending':
+      return { label: 'Comercio (Pendiente Aprobación)', className: 'bg-yellow-100 text-yellow-800' };
+    default:
+      return { label: 'Usuario', className: 'bg-blue-100 text-blue-800' };
+  }
+}

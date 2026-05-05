@@ -1,37 +1,15 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Plus, X, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Building2, Store, ShoppingBag, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, X, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Building2, Store, ShoppingBag, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { formatCLP } from '../lib/utils';
+import { getRoleBadge } from '../lib/utils';
 import { useToast } from '../hooks/useToast';
 import { Toast } from '../components/Toast';
 
 const COMUNAS = ['Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'La Reina', 'Peñalolén'];
-const PLAN_PRICES: Record<string, number> = { basico: 59900, pro: 89900, full: 149900 };
 
-const planBadge = (plan: string) => {
-  const styles: Record<string, string> = {
-    free: 'bg-[#F5F5F5] text-[#666]',
-    basico: 'bg-green-100 text-green-700',
-    pro: 'bg-blue-100 text-blue-700',
-    full: 'bg-[#7C3AED]/10 text-[#7C3AED]',
-  };
-  const labels: Record<string, string> = { free: 'Free', basico: 'Básico', pro: 'Pro', full: 'Full' };
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${styles[plan] ?? styles.free}`}>
-      {labels[plan] ?? plan}
-    </span>
-  );
-};
-
-const expiryWarning = (valid_until: string | null) => {
-  if (!valid_until) return null;
-  const diff = (new Date(valid_until).getTime() - Date.now()) / 86400000;
-  if (diff < 0) return <span className="text-xs font-bold text-[#CC0000]">Vencido</span>;
-  if (diff < 7) return <span className="text-xs font-bold text-amber-500">Vence {Math.ceil(diff)}d</span>;
-  return <span className="text-xs text-[#666]">{new Date(valid_until).toLocaleDateString('es-CL')}</span>;
-};
 
 const EMPTY_FORM = {
   name: '', branch_name: '', address: '', comuna: '', phone: '', website: '',
@@ -69,7 +47,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [gymSearch, setGymSearch] = useState('');
   const [gymFilter, setGymFilter] = useState('todos');
   const [selectedGymHistory, setSelectedGymHistory] = useState<string | null>(null);
-  const [newGym, setNewGym] = useState({ name: '', branch_name: '', plan: 'free', plan_price: 0, services_count: 0, coupons_count: 0, is_active: true });
+  const [, setNewGym] = useState({ name: '', branch_name: '', plan: 'free', plan_price: 0, services_count: 0, coupons_count: 0, is_active: true });
   const [comercioSearch, setComercioSearch] = useState('');
   const [comercioFilter, setComercioFilter] = useState('todos');
   const [selectedComercioHistory, setSelectedComercioHistory] = useState<string | null>(null);
@@ -94,7 +72,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
       supabase.from('gyms').select('*, gym_subscriptions(plan,plan_price,status,valid_until), gym_branches(id), gym_admins(id)').order('name'),
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('contact_messages').select('*').order('created_at', { ascending: false }),
-      supabase.from('gym_admin_requests').select('*, users(email,full_name)').order('created_at', { ascending: false }),
+      supabase.from('gym_admin_requests').select('*, users(email,full_name,role)').order('created_at', { ascending: false }),
       supabase.from('commerces').select('*, commerce_subscriptions(plan,status,valid_until)').order('name'),
       supabase.from('coupon_redemptions').select('*').order('redeemed_at', { ascending: false }),
     ]);
@@ -160,11 +138,6 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     fetchAll();
   };
 
-  const updateUserRole = async (userId: string, role: string) => {
-    await supabase.from('users').update({ role }).eq('id', userId);
-    fetchAll();
-  };
-
   const toggleUserPremium = async (userId: string, current: boolean) => {
     await supabase.from('users').update({
       is_premium: !current,
@@ -173,9 +146,18 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     fetchAll();
   };
 
-  const markMessageRead = async (id: string) => {
-    await supabase.from('contact_messages').update({ is_read: true }).eq('id', id);
-    fetchAll();
+  const handleMarkAsRead = async (messageId: string) => {
+    const { error } = await supabase
+      .from('contact_messages')
+      .update({ is_read: true })
+      .eq('id', messageId);
+
+    if (!error) {
+      setMessages(messages.map(msg =>
+        msg.id === messageId ? { ...msg, is_read: true } : msg
+      ));
+      showToast('Mensaje marcado como leído', 'success');
+    }
   };
 
   const toggleCommerceActive = async (commerce: any) => {
@@ -439,15 +421,6 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
   // Metrics
   const activeGyms = gyms.filter(g => g.is_active).length;
-  const offlineSensors = gyms.filter(g => !g.sensor_online).length;
-  const expiringSoon = gyms.filter(g => {
-    if (!g.valid_until) return false;
-    const diff = (new Date(g.valid_until).getTime() - Date.now()) / 86400000;
-    return diff >= 0 && diff < 7;
-  }).length;
-  const monthlyRevenue = gyms
-    .filter(g => g.sub_status === 'active' && g.plan !== 'free')
-    .reduce((sum, g) => sum + (PLAN_PRICES[g.plan] ?? 0), 0);
   const totalRedemptions = redemptions.length;
   const thisMonthRedemptions = redemptions.filter((r: any) => new Date(r.redeemed_at) > new Date(Date.now() - 30 * 86400000)).length;
   const premiumUsers = users.filter((u: any) => u.is_premium).length;
@@ -1125,9 +1098,15 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
               );
               return filtered.map((req: any) => (
                 <div key={req.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3">
+                  {(() => {
+                    const reqRoleBadge = getRoleBadge(req.users?.role);
+                    return (
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-bold text-[#111]">{req.gym_name}</p>
+                      <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${reqRoleBadge.className}`}>
+                        {reqRoleBadge.label}
+                      </span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {(req.comunas ?? []).map((c: string) => (
                           <span key={c} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F5F5F5] text-[#666]">{c}</span>
@@ -1138,6 +1117,8 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                     {req.status === 'approved' && <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Aprobado</span>}
                     {req.status === 'rejected' && <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-[#CC0000]">Rechazado</span>}
                   </div>
+                    );
+                  })()}
                   <div className="grid grid-cols-2 gap-1 text-xs text-[#666]">
                     <span>{req.users?.email ?? ''}</span>
                     <span>{req.phone}</span>
@@ -1209,7 +1190,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
               };
 
               const q = userSearch.toLowerCase();
-              let filtered = users.filter((u: any) => {
+              const filtered = users.filter((u: any) => {
                 if (q) {
                   const matchName = u.full_name?.toLowerCase().includes(q);
                   const matchEmail = u.email?.toLowerCase().includes(q);
@@ -1269,6 +1250,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                   {filtered.map((u: any) => {
                     const status = getUserStatus(u);
                     const cfg = statusConfig[status];
+                    const roleBadge = getRoleBadge(u.role);
                     const daysLeft = u.plan_valid_until
                       ? Math.ceil((new Date(u.plan_valid_until).getTime() - now) / 86400000)
                       : null;
@@ -1290,6 +1272,9 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-bold text-[#111] text-sm">{u.full_name ?? 'Sin nombre'}</p>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleBadge.className}`}>
+                                {roleBadge.label}
+                              </span>
                               <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.badge}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
                                 {cfg.label}
@@ -1463,7 +1448,9 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             </div>
 
             {(() => {
-              const filtered = messages.filter((m: any) => messageFilter === 'todos' || m.type === messageFilter);
+              const unreadMessages = messages.filter((m: any) => !m.is_read);
+              const baseMessages = messageFilter === 'todos' ? unreadMessages : messages;
+              const filtered = baseMessages.filter((m: any) => messageFilter === 'todos' || m.type === messageFilter);
               const typeBadge = (type: string) => {
                 const styles: Record<string, string> = {
                   'Soporte': 'bg-amber-100 text-amber-700',
@@ -1498,10 +1485,10 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                   </p>
                   {!m.is_read && (
                     <button
-                      onClick={() => markMessageRead(m.id)}
-                      className="w-full py-2 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-xl active:scale-[0.98] transition-transform"
+                      onClick={() => handleMarkAsRead(m.id)}
+                      className="text-sm text-blue-600 hover:text-blue-800"
                     >
-                      Marcar leído
+                      Marcar como leído
                     </button>
                   )}
                 </div>

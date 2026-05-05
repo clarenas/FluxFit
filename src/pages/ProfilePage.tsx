@@ -1,23 +1,18 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Eye, Mail, Settings, Store, Shield, LayoutDashboard } from 'lucide-react';
+import { LogOut, Eye, Mail, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getInitials } from '../lib/utils';
+import { getInitials, getRoleBadge } from '../lib/utils';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useGyms } from '../hooks/useGyms';
 
-const ROLE_LABELS: Record<string, string> = {
-  fluxfit_admin:  'Administrador FluxFit',
-  gym_admin:      'Administrador de Gym',
-  commerce_admin: 'Administrador de Comercio',
-  user:           'Usuario',
-};
-
 export function ProfilePage() {
   const navigate = useNavigate();
   const { user, signOut, isGuest } = useAuth();
-  const role = user?.role ?? 'user';
-  const isAdminRole = role !== 'user';
+  const [profileData, setProfileData] = useState<{ role: string; full_name: string; email: string } | null>(null);
+  const role = profileData?.role ?? user?.role ?? 'user';
+  const roleBadge = getRoleBadge(role);
+  const isAdminRole = ['fluxfit_admin', 'gym_admin', 'commerce_admin'].includes(role);
   const isPremium = user?.is_premium ?? false;
 
   // User-only: favorites
@@ -25,12 +20,23 @@ export function ProfilePage() {
   const { gyms: allGyms } = useGyms();
   const favGyms = allGyms.filter(g => favIds.includes(g.id));
 
+  const fetchProfileData = useCallback(async () => {
+    if (!user || isGuest) return;
+    const { data } = await supabase
+      .from('users')
+      .select('role, full_name, email')
+      .eq('id', user.id)
+      .single();
+    if (data) setProfileData(data);
+  }, [user, isGuest]);
+
   const fetchFavGyms = useCallback(async () => {
     if (!user || isGuest || isAdminRole) return;
     const { data } = await supabase.from('user_favorite_gyms').select('gym_id').eq('user_id', user.id);
     setFavIds(data ? data.map(f => f.gym_id) : []);
   }, [user, isGuest, isAdminRole]);
 
+  useEffect(() => { fetchProfileData(); }, [fetchProfileData]);
   useEffect(() => { fetchFavGyms(); }, [fetchFavGyms]);
 
   const handleSignOut = async () => { await signOut(); navigate('/'); };
@@ -69,7 +75,6 @@ export function ProfilePage() {
   // ── Admin roles: clean profile with admin panel access only ───────────────
   if (isAdminRole) {
     const adminPath = role === 'fluxfit_admin' ? '/admin/fluxfit' : role === 'gym_admin' ? '/admin/gym' : '/admin/commerce';
-    const AdminIcon = role === 'fluxfit_admin' ? Shield : role === 'gym_admin' ? Settings : Store;
     const adminLabel = role === 'fluxfit_admin' ? 'Panel Global FluxFit' : role === 'gym_admin' ? 'Panel de mi Gym' : 'Panel de mi Comercio';
     return (
       <div className="min-h-screen bg-[#F5F5F5] pb-20">
@@ -83,10 +88,10 @@ export function ProfilePage() {
               {user ? getInitials(user.full_name) : '?'}
             </div>
             <div className="flex-1">
-              <h2 className="font-bold text-[#111111]">{user?.full_name || 'Administrador'}</h2>
-              <p className="text-sm text-[#666666]">{user?.email}</p>
-              <span className="inline-block mt-1 bg-[#111] text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                {ROLE_LABELS[role] ?? role}
+              <h2 className="font-bold text-[#111111]">{profileData?.full_name || user?.full_name || 'Administrador'}</h2>
+              <p className="text-sm text-[#666666]">{profileData?.email || user?.email}</p>
+              <span className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium ${roleBadge.className}`}>
+                {roleBadge.label}
               </span>
             </div>
           </div>
@@ -133,8 +138,11 @@ export function ProfilePage() {
             {user ? getInitials(user.full_name) : '?'}
           </div>
           <div className="flex-1">
-            <h2 className="font-bold text-[#111111]">{user?.full_name || 'Usuario'}</h2>
-            <p className="text-sm text-[#666666]">{user?.email}</p>
+            <h2 className="font-bold text-[#111111]">{profileData?.full_name || user?.full_name || 'Usuario'}</h2>
+            <p className="text-sm text-[#666666]">{profileData?.email || user?.email}</p>
+            <span className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium ${roleBadge.className}`}>
+              {roleBadge.label}
+            </span>
             {isPremium && (
               <span className="inline-block mt-1 bg-[#CC0000] text-white text-xs font-bold px-2 py-0.5 rounded-full">
                 FluxFit Premium

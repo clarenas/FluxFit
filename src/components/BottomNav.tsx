@@ -1,9 +1,10 @@
 import {
   Home, Heart, Star, User, LayoutDashboard, GitBranch,
-  Tag, BarChart2, Ticket, Users, TrendingUp, Settings, Cpu,
+  Tag, BarChart2, Ticket, Users, TrendingUp, Settings, Cpu, LogOut,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 type NavTab = { path: string; label: string; Icon: React.ElementType };
 
@@ -52,6 +53,11 @@ export function BottomNav() {
     return location.pathname.startsWith(path);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/auth');
+  };
+
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:fixed md:left-0 md:top-0 md:translate-x-0 md:bottom-auto md:w-[200px] md:h-screen md:max-w-none bg-white border-t border-[#E5E5E5] md:border-t-0 md:border-r md:border-[#E5E5E5] flex items-center justify-around z-40">
       <div className="flex justify-around items-center h-16 px-2 w-full md:flex-col md:h-full md:justify-start md:items-stretch md:px-0 md:pt-8 md:gap-1">
@@ -74,6 +80,28 @@ export function BottomNav() {
             </button>
           );
         })}
+
+        <button
+          onClick={handleLogout}
+          className="flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] md:hidden"
+        >
+          <LogOut size={22} className="text-[#666]" strokeWidth={1.5} />
+          <span className="text-[10px] font-medium text-[#666]">Salir</span>
+        </button>
+
+        <div className="hidden md:block mt-auto px-3 pb-4">
+          {/* Separador */}
+          <div className="border-t border-gray-200 my-2" />
+
+          {/* Cerrar sesión */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors w-full text-left"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
       </div>
     </nav>
   );

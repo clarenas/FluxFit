@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
-import { Check, Star, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Check, Star, TrendingUp, Tag } from 'lucide-react';
 import { FluxFitLogo } from '../components/FluxFitLogo';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -130,7 +132,8 @@ function PlanCard({ name, price, features, isCurrent, isPopular, onRequest, requ
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function PremiumPage() {
-  const { user, isGuest } = useAuth();
+  const navigate = useNavigate();
+  const { user, isGuest, signOut } = useAuth();
   const { toast, showToast } = useToast();
 
   // Role is read directly from context — no async needed
@@ -141,6 +144,7 @@ export function PremiumPage() {
   const [currentPlan, setCurrentPlan] = useState<string>('free');
   const [requestSent, setRequestSent] = useState<string | null>(null);
   const [requesting, setRequesting] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'perfil' | 'descuentos-fluxfit'>('perfil');
 
   // Revenue data for fluxfit_admin
   const [adminRevenue, setAdminRevenue] = useState<{
@@ -206,6 +210,11 @@ export function PremiumPage() {
     } finally {
       setRequesting(null);
     }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/auth');
   };
 
   // ── FluxFit Admin: revenue dashboard (no payment options) ──────────────────
@@ -354,13 +363,61 @@ export function PremiumPage() {
       </div>
       <div className="px-4 -mt-2 pt-4 space-y-4">
         {isPremium ? (
-          <div className="bg-[#16A34A]/10 border border-[#16A34A]/30 rounded-2xl p-5 text-center">
-            <p className="text-[#16A34A] font-bold text-lg">Ya eres miembro Premium</p>
-            {user?.premium_since && (
-              <p className="text-[#16A34A] text-sm mt-1">
-                Miembro desde {new Date(user.premium_since).toLocaleDateString('es-CL')}
-              </p>
-            )}
+          <div className="md:grid md:grid-cols-[240px_1fr] md:gap-6 md:items-start">
+            <aside className="bg-white border border-[#E5E5E5] rounded-2xl p-3 space-y-1 h-fit">
+              <button
+                onClick={() => setActiveTab('perfil')}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors w-full text-left ${
+                  activeTab === 'perfil'
+                    ? 'bg-[#CC0000] text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span>Perfil</span>
+              </button>
+
+              {/* Descuentos FluxFit */}
+              <button
+                onClick={() => setActiveTab('descuentos-fluxfit')}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  activeTab === 'descuentos-fluxfit'
+                    ? 'bg-[#CC0000] text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <Tag className="w-5 h-5" />
+                <span>Descuentos FluxFit</span>
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors w-full text-left"
+              >
+                <span>Cerrar sesión</span>
+              </button>
+            </aside>
+
+            <div className="mt-4 md:mt-0">
+              {activeTab === 'perfil' && (
+                <div className="bg-[#16A34A]/10 border border-[#16A34A]/30 rounded-2xl p-5 text-center">
+                  <p className="text-[#16A34A] font-bold text-lg">Ya eres miembro Premium</p>
+                  {user?.premium_since && (
+                    <p className="text-[#16A34A] text-sm mt-1">
+                      Miembro desde {new Date(user.premium_since).toLocaleDateString('es-CL')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'descuentos-fluxfit' && (
+                <div className="space-y-6 bg-white border border-[#E5E5E5] rounded-2xl p-5">
+                  <h1 className="text-3xl font-bold">Descuentos FluxFit</h1>
+                  <p className="text-gray-600">
+                    Próximamente: cupones de descuento de gyms y comercios adheridos
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <>

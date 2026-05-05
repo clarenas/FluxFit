@@ -11,7 +11,7 @@ export function useGyms() {
     setLoading(true);
     const { data, error } = await supabase
       .from('gyms')
-      .select('id, name, address, comuna, current_count, max_capacity, occupancy_percentage, occupancy_status, sensor_online, last_sensor_ping, is_active, logo_url, cover_image_url')
+      .select('*')
       .eq('is_active', true);
     if (error) setError('No se pudieron cargar los gyms.');
     if (data) setGyms(data);
