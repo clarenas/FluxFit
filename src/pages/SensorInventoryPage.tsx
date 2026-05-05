@@ -511,7 +511,7 @@ export function SensorInventoryPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 {label('Marca')}
-                <input value={regForm.brand} onChange={e => setRegForm(f => ({ ...f, brand: e.target.value }))} placeholder="ej: FluxFit" className={inp} />
+                <input value={regForm.brand} onChange={e => setRegForm(f => ({ ...f, brand: e.target.value }))} placeholder="ej: GoFitNow" className={inp} />
                 {regErrors.brand && <p className="text-xs text-[#CC0000] mt-1">{regErrors.brand}</p>}
               </div>
               <div>
@@ -642,7 +642,7 @@ export function SensorInventoryPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 {label('Marca')}
-                <input value={replaceForm.brand} onChange={e => setReplaceForm(f => ({ ...f, brand: e.target.value }))} className={inp} placeholder="ej: FluxFit" />
+                <input value={replaceForm.brand} onChange={e => setReplaceForm(f => ({ ...f, brand: e.target.value }))} className={inp} placeholder="ej: GoFitNow" />
                 {replaceErrors.brand && <p className="text-xs text-[#CC0000] mt-1">{replaceErrors.brand}</p>}
               </div>
               <div>
@@ -758,7 +758,7 @@ export function SensorInventoryPage() {
           <div className="flex items-center gap-3">
             <Cpu size={20} className="text-[#CC0000]" />
             <div>
-              <p className="text-white/50 text-xs">FluxFit Admin</p>
+              <p className="text-white/50 text-xs">GoFitNow Admin</p>
               <h1 className="text-white font-bold text-xl">Inventario de Sensores</h1>
             </div>
           </div>
@@ -771,7 +771,7 @@ export function SensorInventoryPage() {
           </button>
         </div>
         <button
-          onClick={() => navigate('/admin/fluxfit')}
+          onClick={() => navigate('/admin/gofitnow')}
           className="mb-3 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors"
         >
           Volver a Admin
@@ -1092,7 +1092,7 @@ export function SensorInventoryPage() {
                               {new Date(kit.created_at).toLocaleDateString('es-CL')}
                             </span>
                           </div>
-                          <p className="text-[11px] text-[#555] mt-1">Kit agregado al inventario FluxFit</p>
+                          <p className="text-[11px] text-[#555] mt-1">Kit agregado al inventario GoFitNow</p>
                         </div>
                       </div>
 

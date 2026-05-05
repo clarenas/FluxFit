@@ -10,7 +10,7 @@ const DEFAULT_SUBTITLE: Record<AppLayoutRole, string> = {
 
 export interface AppLayoutProps {
   role: AppLayoutRole;
-  /** Línea pequeña bajo “FLUXFIT” (misma jerarquía visual que AdminFluxFit sidebar). */
+  /** Línea pequeña bajo “GOFITNOW” (misma jerarquía visual que AdminGoFitNow sidebar). */
   subtitle?: string;
   /** Contenido a la derecha del bloque de título (ej. badge Premium). */
   headerRight?: ReactNode;
@@ -19,7 +19,7 @@ export interface AppLayoutProps {
 
 /**
  * Shell compartido: mismo rail que BottomNav en desktop, topbar estilo panel Admin,
- * fondo #F5F5F5 y contenedor central acotado como el main de AdminFluxFit.
+ * fondo #F5F5F5 y contenedor central acotado como el main de AdminGoFitNow.
  */
 export function AppLayout({ role, subtitle, headerRight, children }: AppLayoutProps) {
   const sub = subtitle ?? DEFAULT_SUBTITLE[role];
@@ -31,7 +31,7 @@ export function AppLayout({ role, subtitle, headerRight, children }: AppLayoutPr
         <header className="shrink-0 sticky top-0 z-30 bg-white border-b border-[#E5E5E5] px-4 pt-5 pb-4 md:px-6">
           <div className="max-w-[900px] mx-auto flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[#CC0000] font-medium text-lg leading-tight">FLUXFIT</p>
+              <p className="text-[#CC0000] font-medium text-lg leading-tight">GOFITNOW</p>
               <p className="text-xs text-[#999] mt-0.5">{sub}</p>
             </div>
             {headerRight ? <div className="flex-shrink-0 pt-0.5">{headerRight}</div> : null}

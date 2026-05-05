@@ -13,12 +13,12 @@ import { ProfilePage } from './pages/ProfilePage';
 import { GymAdminPage } from './pages/GymAdminPage';
 import { CommerceAdminPage } from './pages/CommerceAdminPage';
 import { ContactPage } from './pages/ContactPage';
-import { AdminFluxFitPage } from './pages/AdminFluxFitPage';
+import { AdminGoFitNowPage } from './pages/AdminGoFitNowPage';
 import { SensorInventoryPage } from './pages/SensorInventoryPage';
 
 // Resolves where an authenticated user should land when hitting "/"
 function roleHome(role: string | undefined): string {
-  if (role === 'fluxfit_admin') return '/admin/fluxfit';
+  if (role === 'gofitnow_admin') return '/admin/gofitnow';
   if (role === 'gym_admin') return '/gym-admin';
   if (role === 'commerce_admin') return '/admin/commerce';
   return '/home';
@@ -61,8 +61,15 @@ function AppShell() {
   const location = useLocation();
 
   const showNav = [
-    '/home', '/favorites', '/premium', '/profile', '/discounts', '/compare',
-  ].some(p => location.pathname.startsWith(p)); // /admin/fluxfit covers /admin/fluxfit/sensores too
+    '/home',
+    '/favorites',
+    '/premium',
+    '/profile',
+    '/discounts',
+    '/compare',
+    '/admin/gym',
+    '/admin/commerce',
+  ].some((p) => location.pathname.startsWith(p));
 
   // While auth is resolving, render nothing to avoid flash
   if (loading) return <LoadingScreen />;
@@ -100,12 +107,12 @@ function AppShell() {
 
             {/* Gym admin routes — role-gated */}
             <Route path="/gym-admin"          element={<RoleGuard role="gym_admin"><GymAdminPage /></RoleGuard>} />
-            <Route path="/gym-admin/discounts" element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="descuentos" /></RoleGuard>} />
-            <Route path="/gym-admin/plan"     element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="mi_plan" /></RoleGuard>} />
+            <Route path="/gym-admin/discounts" element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="descuentos_promociones" /></RoleGuard>} />
+            <Route path="/gym-admin/plan"     element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="actualizar_plan" /></RoleGuard>} />
             <Route path="/admin/gym"          element={<RoleGuard role="gym_admin"><GymAdminPage /></RoleGuard>} />
             <Route path="/admin/gym/branches" element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="sucursales" /></RoleGuard>} />
             <Route path="/admin/gym/offers"   element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="planes" /></RoleGuard>} />
-            <Route path="/admin/gym/premium"  element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="mi_plan" /></RoleGuard>} />
+            <Route path="/admin/gym/premium"  element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="actualizar_plan" /></RoleGuard>} />
 
             {/* Commerce admin routes — role-gated */}
             <Route path="/admin/commerce"          element={<RoleGuard role="commerce_admin"><CommerceAdminPage /></RoleGuard>} />
@@ -113,12 +120,12 @@ function AppShell() {
             <Route path="/admin/commerce/stats"    element={<RoleGuard role="commerce_admin"><CommerceAdminPage initialTab="estadisticas" /></RoleGuard>} />
             <Route path="/admin/commerce/premium"  element={<RoleGuard role="commerce_admin"><CommerceAdminPage initialTab="mi_plan" /></RoleGuard>} />
 
-            {/* FluxFit super-admin routes — role-gated */}
-            <Route path="/admin/fluxfit"           element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage /></RoleGuard>} />
-            <Route path="/admin/fluxfit/socios"    element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="pendientes" /></RoleGuard>} />
-            <Route path="/admin/fluxfit/impacto"   element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="impacto" /></RoleGuard>} />
-            <Route path="/admin/fluxfit/config"    element={<RoleGuard role="fluxfit_admin"><AdminFluxFitPage initialTab="usuarios" /></RoleGuard>} />
-            <Route path="/admin/fluxfit/sensores"  element={<RoleGuard role="fluxfit_admin"><SensorInventoryPage /></RoleGuard>} />
+            {/* GoFitNow super-admin routes — role-gated */}
+            <Route path="/admin/gofitnow"           element={<RoleGuard role="gofitnow_admin"><AdminGoFitNowPage /></RoleGuard>} />
+            <Route path="/admin/gofitnow/socios"    element={<RoleGuard role="gofitnow_admin"><AdminGoFitNowPage initialTab="pendientes" /></RoleGuard>} />
+            <Route path="/admin/gofitnow/impacto"   element={<RoleGuard role="gofitnow_admin"><AdminGoFitNowPage initialTab="impacto" /></RoleGuard>} />
+            <Route path="/admin/gofitnow/config"    element={<RoleGuard role="gofitnow_admin"><AdminGoFitNowPage initialTab="usuarios" /></RoleGuard>} />
+            <Route path="/admin/gofitnow/sensores"  element={<RoleGuard role="gofitnow_admin"><SensorInventoryPage /></RoleGuard>} />
 
             {/* Catch-all: send to role home */}
             <Route path="*" element={<Navigate to={user ? roleHome(user.role) : '/auth'} replace />} />

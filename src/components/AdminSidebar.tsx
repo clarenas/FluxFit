@@ -9,6 +9,8 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }> | string;
   hasSubmenu?: boolean;
   subItems?: { id: string; label: string }[];
+  /** Render a horizontal rule above this item */
+  separator?: boolean;
 }
 
 interface AdminSidebarProps {
@@ -31,7 +33,7 @@ export default function AdminSidebar({
   onToggleSubmenu,
   activeSubTab,
   onSubTabChange,
-  logo = 'FLUXFIT',
+  logo = 'GOFITNOW',
   title = 'Panel Admin'
 }: AdminSidebarProps) {
   const navigate = useNavigate();
@@ -42,7 +44,7 @@ export default function AdminSidebar({
   };
 
   return (
-    <aside style={{ width: 200, flexShrink: 0 }} className="bg-white border-r border-[#E5E5E5] flex flex-col overflow-y-auto">
+    <aside style={{ width: 240, flexShrink: 0 }} className="bg-white border-r border-[#E5E5E5] flex flex-col overflow-y-auto">
       {/* Header */}
       <div className="px-4 pt-5 pb-4 border-b border-[#F0F0F0]">
         <p style={{ color: '#CC0000', fontWeight: 500, fontSize: 18 }}>{logo}</p>
@@ -53,6 +55,7 @@ export default function AdminSidebar({
       <nav className="flex-1 py-2">
         {navItems.map((item) => (
           <div key={item.id}>
+            {item.separator ? <div className="mx-3 my-2 h-px bg-[#E5E5E5]" /> : null}
             <button
               onClick={() => {
                 onTabChange(item.id);

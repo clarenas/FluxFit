@@ -88,8 +88,8 @@ type RoleBadge = { label: string; className: string };
 
 export function getRoleBadge(role: string | null | undefined): RoleBadge {
   switch (role) {
-    case 'fluxfit_admin':
-      return { label: 'Admin FluxFit', className: 'bg-red-100 text-red-800' };
+    case 'gofitnow_admin':
+      return { label: 'Admin GoFitNow', className: 'bg-red-100 text-red-800' };
     case 'gym_admin':
       return { label: 'Gimnasio', className: 'bg-green-100 text-green-800' };
     case 'commerce_admin':

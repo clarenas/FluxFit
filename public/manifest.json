@@ -1,6 +1,6 @@
 {
-  "name": "FluxFit",
-  "short_name": "FluxFit",
+  "name": "GoFitNow",
+  "short_name": "GoFitNow",
   "description": "Tu gym. Tu tiempo.",
   "start_url": "/home",
   "scope": "/",

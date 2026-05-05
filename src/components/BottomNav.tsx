@@ -28,12 +28,12 @@ const ROLE_TABS: Record<string, NavTab[]> = {
     { path: '/admin/commerce/stats',   label: 'Estadísticas',Icon: BarChart2 },
     { path: '/admin/commerce/premium', label: 'Mi Plan',     Icon: Star },
   ],
-  fluxfit_admin: [
-    { path: '/admin/fluxfit',          label: 'Dashboard', Icon: LayoutDashboard },
-    { path: '/admin/fluxfit/socios',   label: 'Socios',    Icon: Users },
-    { path: '/admin/fluxfit/sensores', label: 'Sensores',  Icon: Cpu },
-    { path: '/admin/fluxfit/impacto',  label: 'Impacto',   Icon: TrendingUp },
-    { path: '/admin/fluxfit/config',   label: 'Config',    Icon: Settings },
+  gofitnow_admin: [
+    { path: '/admin/gofitnow',          label: 'Dashboard', Icon: LayoutDashboard },
+    { path: '/admin/gofitnow/socios',   label: 'Socios',    Icon: Users },
+    { path: '/admin/gofitnow/sensores', label: 'Sensores',  Icon: Cpu },
+    { path: '/admin/gofitnow/impacto',  label: 'Impacto',   Icon: TrendingUp },
+    { path: '/admin/gofitnow/config',   label: 'Config',    Icon: Settings },
   ],
 };
 
@@ -49,20 +49,20 @@ export function BottomNav() {
   const tabs = role === 'user' && isPremium
     ? [
         ...baseTabs.slice(0, 3),
-        { path: '/discounts', label: 'Descuentos Fluxfit', Icon: Tag },
+        { path: '/discounts', label: 'Descuentos GoFitNow', Icon: Tag },
         { path: '/compare', label: 'Comparar', Icon: BarChart2 },
         ...baseTabs.slice(3),
       ]
     : baseTabs;
   const sidebarSubtitle =
-    role === 'fluxfit_admin' ? 'Panel Admin' :
+    role === 'gofitnow_admin' ? 'Panel Admin' :
     role === 'gym_admin' ? 'Panel Gym' :
     role === 'commerce_admin' ? 'Panel Comercio' :
     'Panel Usuario';
 
   const isActive = (path: string) => {
     // Exact match for root admin paths to avoid /admin/gym matching /admin/gym/branches
-    const exactRoots = ['/admin/gym', '/admin/commerce', '/admin/fluxfit'];
+    const exactRoots = ['/admin/gym', '/admin/commerce', '/admin/gofitnow'];
     if (exactRoots.includes(path)) return location.pathname === path;
     return location.pathname.startsWith(path);
   };
@@ -76,7 +76,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:fixed md:left-0 md:top-0 md:translate-x-0 md:bottom-auto md:w-[200px] md:h-screen md:max-w-none bg-white border-t border-[#E5E5E5] md:border-t-0 md:border-r md:border-[#E5E5E5] flex items-center justify-around z-40">
       <div className="flex justify-around items-center h-16 px-2 w-full md:flex-col md:h-full md:justify-start md:items-stretch md:px-0 md:gap-0">
         <div className="hidden md:block px-4 pt-5 pb-4 border-b border-[#F0F0F0]">
-          <p style={{ color: '#CC0000', fontWeight: 500, fontSize: 18 }}>FLUXFIT</p>
+          <p style={{ color: '#CC0000', fontWeight: 500, fontSize: 18 }}>GOFITNOW</p>
           <p style={{ fontSize: 12 }} className="text-[#999] mt-0.5">{sidebarSubtitle}</p>
         </div>
         <div className="hidden md:block py-2" />

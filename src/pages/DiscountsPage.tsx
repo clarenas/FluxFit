@@ -168,7 +168,7 @@ export function DiscountsPage() {
     return (
       <div className="space-y-4">
         <div className="bg-[#111111] px-4 pt-6 pb-4">
-          <p className="text-white/50 text-xs mb-0.5">FluxFit</p>
+          <p className="text-white/50 text-xs mb-0.5">GoFitNow</p>
           <h1 className="text-white font-bold text-xl">Descuentos Fluxfit</h1>
         </div>
         <div className="bg-white rounded-xl border border-[#E5E5E5] p-5 text-sm text-[#666]">
@@ -181,7 +181,7 @@ export function DiscountsPage() {
   return (
     <div className="space-y-4">
       <div className="bg-[#111111] px-4 pt-6 pb-4">
-        <p className="text-white/50 text-xs mb-0.5">FluxFit</p>
+        <p className="text-white/50 text-xs mb-0.5">GoFitNow</p>
         <h1 className="text-white font-bold text-xl">Descuentos Fluxfit</h1>
       </div>
 

@@ -17,6 +17,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** DB/RLS may still store legacy `fluxfit_admin`; app uses `gofitnow_admin` uniformly. */
+function normalizeUserRole<T extends { role: string }>(row: T): T {
+  if (row.role === 'fluxfit_admin') return { ...row, role: 'gofitnow_admin' };
+  return row;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -39,11 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from('commerce_admins').select('id').eq('user_id', userId).maybeSingle(),
       ]);
 
-      if (gymAdmin) return { ...data, role: 'gym_admin' };
-      if (commerceAdmin) return { ...data, role: 'commerce_admin' };
+      if (gymAdmin) return normalizeUserRole({ ...data, role: 'gym_admin' });
+      if (commerceAdmin) return normalizeUserRole({ ...data, role: 'commerce_admin' });
     }
 
-    return data;
+    return normalizeUserRole(data);
   };
 
   const waitForProfile = async (userId: string): Promise<User | null> => {
@@ -79,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsGuest(false);
         }
       } else {
-        const savedGuest = sessionStorage.getItem('fluxfit_guest');
+        const savedGuest = sessionStorage.getItem('gofitnow_guest');
         if (savedGuest === 'true' && mounted) setIsGuest(true);
       }
 
@@ -145,13 +151,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setIsGuest(false);
-    sessionStorage.removeItem('fluxfit_guest');
+    sessionStorage.removeItem('gofitnow_guest');
   };
 
   const enterAsGuest = () => {
     setIsGuest(true);
     setLoading(false);
-    sessionStorage.setItem('fluxfit_guest', 'true');
+    sessionStorage.setItem('gofitnow_guest', 'true');
   };
 
   return (

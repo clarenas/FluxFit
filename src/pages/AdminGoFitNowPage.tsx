@@ -22,9 +22,9 @@ const PLAN_DISPLAY: Record<string, { label: string; price: string; value: number
   pro:   { label: 'Pro',   price: '$149.900', value: 149900 },
 };
 
-interface AdminFluxFitProps { initialTab?: string; }
+interface AdminGoFitNowProps { initialTab?: string; }
 
-export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
+export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab ?? 'dashboard');
@@ -149,7 +149,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   }, [initialTab]);
 
   useEffect(() => {
-    if (user && user.role !== 'fluxfit_admin') {
+    if (user && user.role !== 'gofitnow_admin') {
       navigate('/home', { replace: true });
     }
   }, [user, navigate]);
@@ -720,7 +720,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
       <aside style={{ width: 200, flexShrink: 0 }} className="bg-white border-r border-[#E5E5E5] flex flex-col overflow-y-auto">
         {/* Logo area */}
         <div className="px-4 pt-5 pb-4 border-b border-[#F0F0F0]">
-          <p style={{ color: '#CC0000', fontWeight: 500, fontSize: 18 }}>FLUXFIT</p>
+          <p style={{ color: '#CC0000', fontWeight: 500, fontSize: 18 }}>GOFITNOW</p>
           <p style={{ fontSize: 12 }} className="text-[#999] mt-0.5">Panel Admin</p>
         </div>
 
@@ -2086,7 +2086,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
               <div className="bg-[#CC0000] rounded-xl p-4 text-center col-span-2">
                 <p className="text-3xl font-bold text-white">{totalRedemptions}</p>
                 <p className="text-sm text-white/80 mt-1">Ventas Generadas</p>
-                <p className="text-xs text-white/60 mt-0.5">Suma total de cupones redimidos en la red FluxFit</p>
+                <p className="text-xs text-white/60 mt-0.5">Suma total de cupones redimidos en la red GoFitNow</p>
               </div>
               <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
                 <p className="text-2xl font-bold text-[#111]">{thisMonthRedemptions}</p>
@@ -2573,7 +2573,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                     type="text"
                     value={sensorForm.brand}
                     onChange={e => setSensorForm({ ...sensorForm, brand: e.target.value })}
-                    placeholder="Ej: FluxFit"
+                    placeholder="Ej: GoFitNow"
                     className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
                   />
                 </div>

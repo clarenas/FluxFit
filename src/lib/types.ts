@@ -192,6 +192,68 @@ export interface GymPromotion {
   created_at: string;
 }
 
+/** Plan comercial del gym (oferta con vigencia y cupón). No confundir con la suscripción GoFitNow (free/light/pro). */
+export type GymPlanOfferTipo = 'mensual' | 'anual' | 'personal_trainer';
+
+/**
+ * Oferta de plan con precio tachado/oferta, vigencia y sedes.
+ * `plazo_inicio` / `plazo_fin`: fechas ISO (ej. 2026-05-01).
+ * `codigo_cupon` y `qr_url` se rellenan al persistir (generación automática).
+ */
+export interface GymPlanOffer {
+  nombre: string;
+  descripcion: string;
+  valor_normal: number;
+  valor_oferta: number;
+  plazo_inicio: string;
+  plazo_fin: string;
+  sedes_aplicables: string[];
+  tipo_plan: GymPlanOfferTipo;
+  codigo_cupon: string;
+  qr_url: string;
+}
+
+/** Datos que ingresa el admin antes de generar cupón y QR. */
+export type GymPlanOfferDraft = Omit<GymPlanOffer, 'codigo_cupon' | 'qr_url'>;
+
+/** Fila persistida (p. ej. tabla futura `gym_plan_offers` o extensión de `gym_plans`). */
+export interface GymPlanOfferRow extends GymPlanOffer {
+  id: string;
+  gym_id: string;
+  is_active?: boolean;
+  created_at?: string;
+}
+
+/** Texto fijo para UI / cupón impreso (puedes igualarlo al guardar en `instruccion`). */
+export const GYM_PROMO_CUPON_INSTRUCCION_DEFAULT =
+  'Descarga tu cupón y preséntalo en tu sucursal';
+
+/**
+ * Promoción tipo cupón (% o monto fijo, vigencia y sedes).
+ * `porcentaje_descuento` y `valor_descuento`: usa el que aplique (el otro puede ser 0).
+ * Fechas en ISO. `codigo_cupon` se genera al persistir; `instruccion` suele ser {@link GYM_PROMO_CUPON_INSTRUCCION_DEFAULT}.
+ */
+export interface GymPromocionCupon {
+  titulo: string;
+  descripcion: string;
+  porcentaje_descuento: number;
+  valor_descuento: number;
+  validez_inicio: string;
+  validez_fin: string;
+  sedes_aplicables: string[];
+  codigo_cupon: string;
+  instruccion: string;
+}
+
+export type GymPromocionCuponDraft = Omit<GymPromocionCupon, 'codigo_cupon' | 'instruccion'>;
+
+export interface GymPromocionCuponRow extends GymPromocionCupon {
+  id: string;
+  gym_id: string;
+  is_active?: boolean;
+  created_at?: string;
+}
+
 export interface CommerceStore {
   id: string;
   commerce_id: string;

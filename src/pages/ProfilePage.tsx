@@ -12,7 +12,7 @@ export function ProfilePage() {
   const [profileData, setProfileData] = useState<{ role: string; full_name: string; email: string } | null>(null);
   const role = profileData?.role ?? user?.role ?? 'user';
   const roleBadge = getRoleBadge(role);
-  const isAdminRole = ['fluxfit_admin', 'gym_admin', 'commerce_admin'].includes(role);
+  const isAdminRole = ['gofitnow_admin', 'gym_admin', 'commerce_admin'].includes(role);
   const isPremium = user?.is_premium ?? false;
 
   // User-only: favorites
@@ -74,8 +74,8 @@ export function ProfilePage() {
 
   // ── Admin roles: clean profile with admin panel access only ───────────────
   if (isAdminRole) {
-    const adminPath = role === 'fluxfit_admin' ? '/admin/fluxfit' : role === 'gym_admin' ? '/admin/gym' : '/admin/commerce';
-    const adminLabel = role === 'fluxfit_admin' ? 'Panel Global FluxFit' : role === 'gym_admin' ? 'Panel de mi Gym' : 'Panel de mi Comercio';
+    const adminPath = role === 'gofitnow_admin' ? '/admin/gofitnow' : role === 'gym_admin' ? '/admin/gym' : '/admin/commerce';
+    const adminLabel = role === 'gofitnow_admin' ? 'Panel Global GoFitNow' : role === 'gym_admin' ? 'Panel de mi Gym' : 'Panel de mi Comercio';
     return (
       <div className="min-h-screen bg-[#F5F5F5] pb-20">
         <div className="bg-white border-b border-[#E5E5E5] px-4 py-3">
@@ -145,7 +145,7 @@ export function ProfilePage() {
             </span>
             {isPremium && (
               <span className="inline-block mt-1 bg-[#CC0000] text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                FluxFit Premium
+                GoFitNow Premium
               </span>
             )}
           </div>

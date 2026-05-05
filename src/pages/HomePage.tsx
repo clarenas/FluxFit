@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useGyms } from '../hooks/useGyms';
 import { GymCard } from '../components/GymCard';
 import { BottomSheet } from '../components/BottomSheet';
-import { FluxFitLogo } from '../components/FluxFitLogo';
+import { GoFitNowLogo } from '../components/GoFitNowLogo';
 import { Toast } from '../components/Toast';
 import { SkeletonList } from '../components/SkeletonList';
 import { useToast } from '../hooks/useToast';
@@ -74,7 +74,7 @@ export function HomePage() {
     <div className="min-h-screen bg-[#F5F5F5] pb-20 md:max-w-[900px] md:mx-auto">
       <Toast {...toast} />
       <div className="bg-white border-b border-[#E5E5E5] px-4 py-3 flex items-center gap-3 sticky top-0 z-40">
-        <FluxFitLogo size="sm" />
+        <GoFitNowLogo size="sm" />
         <span className="text-[#111111] font-semibold flex-1">Hola, {isGuest ? 'invitado' : (user?.full_name?.split(' ')[0] || 'usuario')}</span>
         {isPremium && <span className="bg-[#CC0000] text-white text-xs font-bold px-2 py-1 rounded-full">✦ Premium</span>}
       </div>
@@ -83,12 +83,12 @@ export function HomePage() {
         {!isPremium && (
           <div className="bg-[#CC0000] rounded-xl p-5 text-white relative overflow-hidden">
             <span className="absolute top-3 right-4 text-3xl opacity-30">✦</span>
-            <h2 className="font-bold text-lg">Hazte miembro FluxFit</h2>
+            <h2 className="font-bold text-lg">Hazte miembro GoFitNow</h2>
             <p className="text-white/80 text-sm mt-1">Precios especiales en todos los gyms y descuentos exclusivos</p>
             <ul className="mt-3 space-y-1.5 text-sm">
               <li className="flex items-center gap-2"><Check size={14} /> Precios rebajados en planes de gym</li>
               <li className="flex items-center gap-2"><Check size={14} /> Descuentos en nutrición y suplementos</li>
-              <li className="flex items-center gap-2"><Check size={14} /> Acceso a toda la red FluxFit</li>
+              <li className="flex items-center gap-2"><Check size={14} /> Acceso a toda la red GoFitNow</li>
             </ul>
             <p className="text-2xl font-bold mt-3">{formatCLP(2990)} <span className="text-sm font-normal">/ mes</span></p>
             <button onClick={() => navigate('/premium')} className="mt-3 w-full py-3 bg-white text-[#CC0000] font-bold rounded-xl active:scale-[0.98] transition-transform">Quiero ser Premium</button>
@@ -96,7 +96,7 @@ export function HomePage() {
         )}
 
         <div>
-          <h2 className="text-[#111111] font-bold text-base mb-3">Descuentos FluxFit</h2>
+          <h2 className="text-[#111111] font-bold text-base mb-3">Descuentos GoFitNow</h2>
           {commercesError && <p className="text-[#CC0000] text-sm py-2">{commercesError}</p>}
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide md:grid md:grid-cols-4 md:overflow-x-visible md:mx-0 md:px-0">
             {commerces.map(c => (
@@ -166,7 +166,7 @@ export function HomePage() {
             ) : (
               <div className="bg-[#CC0000]/10 border border-[#CC0000]/30 rounded-xl p-4 flex items-center gap-3">
                 <Lock size={20} className="text-[#CC0000]" />
-                <p className="text-[#CC0000] text-sm font-medium">Activa tu membresía FluxFit para acceder</p>
+                <p className="text-[#CC0000] text-sm font-medium">Activa tu membresía GoFitNow para acceder</p>
               </div>
             )}
             {selectedCommerce.address && <p className="text-sm text-[#666666]">📍 {selectedCommerce.address}</p>}

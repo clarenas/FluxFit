@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fluxfit-v1';
+const CACHE_NAME = 'gofitnow-v1';
 const SHELL_URLS = ['/', '/home', '/index.html'];
 
 self.addEventListener('install', event => {

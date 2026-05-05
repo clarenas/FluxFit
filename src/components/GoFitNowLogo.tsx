@@ -1,4 +1,4 @@
-export function FluxFitLogo({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg' }) {
+export function GoFitNowLogo({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg' }) {
   const sizes = {
     sm: { circle: 'w-8 h-8', icon: 14, text: 'text-lg' },
     md: { circle: 'w-12 h-12', icon: 20, text: 'text-2xl' },
@@ -19,8 +19,9 @@ export function FluxFitLogo({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg' }) {
         </svg>
       </div>
       <div className={`${s.text} font-bold italic tracking-tight`}>
-        <span className="text-[#CC0000]">FLUX</span>
+        <span className="text-[#CC0000]">GO</span>
         <span className="text-[#111111]">FIT</span>
+        <span className="text-[#CC0000]">NOW</span>
       </div>
     </div>
   );

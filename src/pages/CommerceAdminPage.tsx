@@ -165,14 +165,14 @@ export function CommerceAdminPage({ initialTab }: Props) {
         navItems={navItems}
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab as Tab)}
-        logo="FLUXFIT"
+        logo="GOFITNOW"
         title="Panel Comercio"
       />
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-[900px] mx-auto w-full px-4 py-4">
           <div className="bg-[#111111] px-4 pt-6 pb-4 mb-4">
-            <p className="text-white/50 text-xs mb-0.5">FluxFit Admin</p>
+            <p className="text-white/50 text-xs mb-0.5">GoFitNow Admin</p>
             <h1 className="text-white font-bold text-xl">{commerce.name}</h1>
             <p className="text-white/60 text-xs mt-0.5">{getCommerceCategoryEmoji(commerce.category)} {getCommerceCategoryLabel(commerce.category)}</p>
             {isPending && (
@@ -232,7 +232,7 @@ export function CommerceAdminPage({ initialTab }: Props) {
                     <input placeholder="% descuento" type="number" value={form.discount_percentage} onChange={e => setForm(f => ({ ...f, discount_percentage: e.target.value }))} className={inp} />
                     <input placeholder="Descripción descuento" value={form.discount_description} onChange={e => setForm(f => ({ ...f, discount_description: e.target.value }))} className={inp} />
                   </div>
-                  <p className="text-[10px] text-amber-600">Al guardar, el perfil quedará pendiente de aprobación por FluxFit.</p>
+                  <p className="text-[10px] text-amber-600">Al guardar, el perfil quedará pendiente de aprobación por GoFitNow.</p>
                   <div className="flex gap-2 pt-1">
                     <button onClick={save} className="flex-1 py-2.5 bg-[#CC0000] text-white font-bold rounded-xl text-sm">Guardar y enviar a revisión</button>
                     <button onClick={() => setEditMode(false)} className="flex-1 py-2.5 border border-[#E5E5E5] rounded-xl text-sm">Cancelar</button>
@@ -346,7 +346,7 @@ export function CommerceAdminPage({ initialTab }: Props) {
               <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#F5F5F5] text-[#666]">{plan === 'premium_commerce' ? 'Premium' : plan === 'basic' ? 'Basic' : 'Free'}</span>
             </div>
             {[
-              { key: 'basic', name: 'Basic', price: 39900, features: ['1 cupón activo', 'Perfil visible en FluxFit', 'Métricas básicas'] },
+              { key: 'basic', name: 'Basic', price: 39900, features: ['1 cupón activo', 'Perfil visible en GoFitNow', 'Métricas básicas'] },
               { key: 'premium_commerce', name: 'Premium', price: 69900, features: ['Cupones ilimitados', 'Todo lo del Basic', 'Validación QR', 'Historial de canjes', 'Métricas completas'], popular: true },
             ].map(p => {
               const isCurrent = plan === p.key;

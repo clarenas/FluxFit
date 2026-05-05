@@ -156,6 +156,6 @@ CREATE TABLE IF NOT EXISTS contact_messages (
 ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can insert contact messages"
   ON contact_messages FOR INSERT WITH CHECK (true);
-CREATE POLICY "FluxFit admin can read messages"
+CREATE POLICY "GoFitNow admin can read messages"
   ON contact_messages FOR SELECT TO authenticated USING (true);
 */

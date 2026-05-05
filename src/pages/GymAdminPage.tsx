@@ -2,13 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { OccupancyGauge } from '../components/OccupancyGauge';
 import { GymBranchesTab } from '../components/admin/GymBranchesTab';
 import { GymPromotionsTab } from '../components/admin/GymPromotionsTab';
 import AdminSidebar from '../components/AdminSidebar';
 import { Toast } from '../components/Toast';
 import { useToast } from '../hooks/useToast';
-import { formatCLP, timeAgo } from '../lib/utils';
+import { formatCLP } from '../lib/utils';
 import type { Gym, GymBranch, GymDiscount, GymPlan, GymPromotion, OccupancyLog } from '../lib/types';
 import { Plus, Trash2, Pencil, Check, X, Clock } from 'lucide-react';
 
@@ -16,41 +15,20 @@ type GymPlanType = 'free' | 'light' | 'pro';
 type BillingCycle = 'monthly' | 'yearly';
 type AdminTab =
   | 'dashboard'
-  | 'mi_gym'
-  | 'sensor'
   | 'perfil'
-  | 'mi_plan'
   | 'sucursales'
   | 'planes'
-  | 'descuentos'
-  | 'metricas'
-  | 'estadisticas_basicas'
-  | 'analytics_pro'
-  | 'notificaciones';
+  | 'descuentos_promociones'
+  | 'actualizar_plan'
+  | 'validar_qr'
+  | 'metricas';
 
 interface Props {
   initialTab?: AdminTab;
 }
 
 const inp = 'w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]';
-const getAnnualPrice = (monthly: number) => monthly * 10;
-const gymPlanCards: Record<GymPlanType, { name: string; monthly: number; benefits: string[] }> = {
-  free: {
-    name: 'FREE',
-    monthly: 0,
-    benefits: ['1 sucursal máximo', 'Dashboard básico', 'Aforo en tiempo real', 'Perfil de gym'],
-  },
-  light: {
-    name: 'LIGHT',
-    monthly: 89900,
-    benefits: ['Hasta 3 sucursales', 'Mis Descuentos', 'Planes y promociones', 'Estadísticas básicas'],
-  },
-  pro: {
-    name: 'PRO',
-    monthly: 149900,
-    benefits: ['Hasta 6 sucursales', 'Analytics Pro', 'Notificaciones', 'Comparativo de rendimiento'],
-  },
-};
+const COMUNAS = ['Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'La Reina', 'Peñalolén'];
 
 export function GymAdminPage({ initialTab }: Props) {
   const navigate = useNavigate();
@@ -64,10 +42,8 @@ export function GymAdminPage({ initialTab }: Props) {
   const [promotions, setPromotions] = useState<GymPromotion[]>([]);
   const [plans, setPlans] = useState<GymPlan[]>([]);
   const [todayLogs, setTodayLogs] = useState<OccupancyLog[]>([]);
-  const [couponUsage, setCouponUsage] = useState<any[]>([]);
   const [subscription, setSubscription] = useState<{ plan: string | null; valid_until: string | null } | null>(null);
   const [subscriptionPlan, setSubscriptionPlan] = useState<GymPlanType>('free');
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab ?? 'dashboard');
   const [editingInfo, setEditingInfo] = useState(false);
   const [infoForm, setInfoForm] = useState({ name: '', address: '', comuna: '', phone: '', website: '', description: '' });
@@ -80,6 +56,7 @@ export function GymAdminPage({ initialTab }: Props) {
   });
   const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [validarCodigoInput, setValidarCodigoInput] = useState('');
 
   const normalizePlan = (planName: string | null | undefined): GymPlanType => {
     if (!planName) return 'free';
@@ -133,7 +110,7 @@ export function GymAdminPage({ initialTab }: Props) {
       }
       const gymId = adminData.gym_id;
 
-      const [{ data: sub }, { data: gymData }, { data: branchesData }, { data: discountsData }, { data: promotionsData }, { data: plansData }, { data: logsData }, { data: usageData }] = await Promise.all([
+      const [{ data: sub }, { data: gymData }, { data: branchesData }, { data: discountsData }, { data: promotionsData }, { data: plansData }, { data: logsData }] = await Promise.all([
         supabase.from('gym_subscriptions').select('plan, valid_until').eq('gym_id', gymId).maybeSingle(),
         supabase.from('gyms').select('*').eq('id', gymId).maybeSingle(),
         supabase.from('gym_branches').select('*').eq('gym_id', gymId).order('created_at'),
@@ -141,7 +118,6 @@ export function GymAdminPage({ initialTab }: Props) {
         supabase.from('gym_promotions').select('*').eq('gym_id', gymId).order('created_at', { ascending: false }),
         supabase.from('gym_plans').select('*').eq('gym_id', gymId).order('created_at', { ascending: false }),
         supabase.from('occupancy_logs').select('*').eq('gym_id', gymId).order('recorded_at', { ascending: false }).limit(20),
-        supabase.from('coupon_usage').select('*').eq('gym_id', gymId).order('used_at', { ascending: false }).limit(100),
       ]);
 
       const resolvedPlan = normalizePlan((gymData as Gym | null)?.plan ?? sub?.plan);
@@ -154,7 +130,6 @@ export function GymAdminPage({ initialTab }: Props) {
           await supabase.from('gyms').update({ billing_cycle: 'monthly' }).eq('id', gymId);
         }
         setGym({ ...(gymData as Gym), plan: resolvedPlan, billing_cycle: resolvedBilling });
-        setBillingCycle(resolvedBilling);
         setIsPending(gymData.approval_status === 'pending');
         setInfoForm({
           name: gymData.name ?? '',
@@ -170,7 +145,6 @@ export function GymAdminPage({ initialTab }: Props) {
       setPromotions((promotionsData ?? []) as GymPromotion[]);
       setPlans((plansData ?? []) as GymPlan[]);
       setTodayLogs((logsData ?? []) as OccupancyLog[]);
-      setCouponUsage((usageData ?? []) as any[]);
     } catch (err: any) {
       setLoadError(err?.message ?? 'No se pudo cargar el panel');
     } finally {
@@ -189,10 +163,7 @@ export function GymAdminPage({ initialTab }: Props) {
 
   useEffect(() => {
     const rolePlan = (gym?.plan ?? subscriptionPlan) as GymPlanType;
-    if (rolePlan === 'free' && ['sucursales', 'planes', 'metricas', 'estadisticas_basicas', 'analytics_pro', 'notificaciones'].includes(activeTab)) {
-      setActiveTab('dashboard');
-    }
-    if (rolePlan === 'light' && ['analytics_pro', 'notificaciones'].includes(activeTab)) {
+    if (rolePlan === 'free' && (['sucursales', 'planes', 'validar_qr'] as AdminTab[]).includes(activeTab)) {
       setActiveTab('dashboard');
     }
   }, [activeTab, subscriptionPlan, gym?.plan]);
@@ -274,6 +245,22 @@ export function GymAdminPage({ initialTab }: Props) {
     await fetchAll();
   };
 
+  const validarCodigoCupom = async () => {
+    const code = validarCodigoInput.trim();
+    if (!code || !gym?.id) {
+      showToast('Ingresa un código de cupón', 'error');
+      return;
+    }
+    const { data } = await supabase
+      .from('gym_discounts')
+      .select('id, title, coupon_code')
+      .eq('gym_id', gym.id)
+      .eq('coupon_code', code)
+      .maybeSingle();
+    if (data) showToast(`Cupón válido: ${data.title || data.coupon_code}`, 'success');
+    else showToast('Cupón no encontrado para este gym', 'error');
+  };
+
   const addGymPlan = async () => {
     if (!gym?.id) return;
     const name = prompt('Nombre del plan');
@@ -350,7 +337,7 @@ export function GymAdminPage({ initialTab }: Props) {
 
     if (isPending) {
       alert(
-        'No puedes cambiar de plan mientras tu perfil esté pendiente de aprobación por FluxFit.\n\nEspera a que tu gym sea aprobado primero.'
+        'No puedes cambiar de plan mientras tu perfil esté pendiente de aprobación por GoFitNow.\n\nEspera a que tu gym sea aprobado primero.'
       );
       return;
     }
@@ -376,56 +363,11 @@ export function GymAdminPage({ initialTab }: Props) {
     void changePlan(newKey);
   };
 
-  const handleChangePlan = async (planId: GymPlanType, billing: BillingCycle) => {
-    if (!gym?.id) return;
-    if (isPending) {
-      showToast('No puedes cambiar de plan con el perfil pendiente de aprobación.', 'error');
-      return;
-    }
-    const currentPlan = (gym?.plan ?? subscriptionPlan) as GymPlanType;
-    const effectiveBilling = planId === 'free' ? 'monthly' : billing;
-    if (currentPlan === planId && billingCycle === effectiveBilling) return;
-
-    await supabase
-      .from('gyms')
-      .update({
-        plan: planId,
-        billing_cycle: effectiveBilling,
-      })
-      .eq('id', gym.id);
-
-    await supabase
-      .from('gym_subscriptions')
-      .upsert(
-        {
-          gym_id: gym.id,
-          plan: planId,
-          plan_price: gymPlanCards[planId].monthly,
-          status: 'active',
-          valid_until: null,
-        },
-        { onConflict: 'gym_id' }
-      );
-
-    setGym((prev) => (prev ? { ...prev, plan: planId, billing_cycle: effectiveBilling } : prev));
-    setSubscriptionPlan(planId);
-    setBillingCycle(effectiveBilling);
-  };
-
-  const persistBillingCycle = async (next: BillingCycle) => {
-    const rolePlan = (gym?.plan ?? subscriptionPlan) as GymPlanType;
-    if (rolePlan === 'free') return;
-    setBillingCycle(next);
-    if (!gym?.id) return;
-    await supabase.from('gyms').update({ billing_cycle: next }).eq('id', gym.id);
-    setGym((prev) => (prev ? { ...prev, billing_cycle: next } : prev));
-  };
-
   const handleSidebarTab = (tab: string) => {
     const t = tab as AdminTab;
     setActiveTab(t);
-    if (t === 'descuentos') navigate('/gym-admin/discounts');
-    else if (t === 'mi_plan') navigate('/gym-admin/plan');
+    if (t === 'descuentos_promociones') navigate('/gym-admin/discounts');
+    else if (t === 'actualizar_plan') navigate('/gym-admin/plan');
     else navigate('/gym-admin');
   };
 
@@ -463,38 +405,36 @@ export function GymAdminPage({ initialTab }: Props) {
   void canManageServices;
   void canManageHours;
 
-  const navItems =
-    plan === 'free'
-      ? [
-          { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-          { id: 'mi_gym', label: 'Mi Gym', icon: '🏢' },
-          { id: 'descuentos', label: 'Mis Descuentos', icon: '🏷️' },
-          { id: 'mi_plan', label: 'Actualizar Plan', icon: '💳' },
-          { id: 'sensor', label: 'Aforo en Tiempo Real', icon: '📡' },
-          { id: 'perfil', label: 'Perfil', icon: '👤' },
-        ]
-      : plan === 'light'
-      ? [
-          { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-          { id: 'sucursales', label: 'Mis Sucursales', icon: '🏢' },
-          { id: 'planes', label: 'Planes y Promociones', icon: '⭐' },
-          { id: 'descuentos', label: 'Mis Descuentos', icon: '🏷️' },
-          { id: 'metricas', label: 'Métricas', icon: '📌' },
-          { id: 'estadisticas_basicas', label: 'Estadísticas Básicas', icon: '📈' },
-          { id: 'mi_plan', label: 'Actualizar Plan', icon: '💳' },
-          { id: 'perfil', label: 'Perfil', icon: '👤' },
-        ]
-      : [
-          { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-          { id: 'sucursales', label: 'Mis Sucursales', icon: '🏢' },
-          { id: 'planes', label: 'Planes y Promociones', icon: '⭐' },
-          { id: 'descuentos', label: 'Mis Descuentos', icon: '🏷️' },
-          { id: 'metricas', label: 'Métricas', icon: '📌' },
-          { id: 'analytics_pro', label: 'Analytics Pro', icon: '📈' },
-          { id: 'notificaciones', label: 'Notificaciones', icon: '🔔' },
-          { id: 'mi_plan', label: 'Actualizar Plan', icon: '💳' },
-          { id: 'perfil', label: 'Perfil', icon: '👤' },
-        ];
+  const TAB_ICONS: Record<AdminTab, string> = {
+    dashboard: '📊',
+    perfil: '👤',
+    sucursales: '🏢',
+    planes: '⭐',
+    descuentos_promociones: '🏷️',
+    actualizar_plan: '💳',
+    validar_qr: '📱',
+    metricas: '📈',
+  };
+
+  const allTabs: { key: AdminTab; label: string; allowed: boolean; separator?: boolean }[] = [
+    { key: 'dashboard', label: 'Dashboard', allowed: true },
+    { key: 'perfil', label: 'Perfil', allowed: true },
+    { key: 'sucursales', label: 'Mis Sucursales', allowed: canManageBranches },
+    { key: 'planes', label: 'Mis Planes', allowed: canManagePlans },
+    { key: 'descuentos_promociones', label: 'Descuentos y Promociones', allowed: canManageDiscounts },
+    { key: 'actualizar_plan', label: 'Actualizar Plan GoFitNow', allowed: true, separator: true },
+    { key: 'validar_qr', label: 'Validar QR', allowed: canValidateQr },
+    { key: 'metricas', label: 'Métricas y Estadísticas', allowed: true },
+  ];
+
+  const navItems = allTabs
+    .filter((t) => t.allowed)
+    .map((t) => ({
+      id: t.key,
+      label: t.label,
+      icon: TAB_ICONS[t.key],
+      separator: t.separator,
+    }));
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -502,14 +442,14 @@ export function GymAdminPage({ initialTab }: Props) {
         navItems={navItems}
         activeTab={activeTab}
         onTabChange={(tab) => handleSidebarTab(tab)}
-        logo="FLUXFIT"
+        logo="GOFITNOW"
         title="Panel Gym"
       />
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-[900px] mx-auto w-full px-4 py-4 space-y-4">
           <div className="bg-[#CC0000] px-4 pt-8 pb-4">
-            <p className="text-white/60 text-xs">FluxFit Admin</p>
+            <p className="text-white/60 text-xs">GoFitNow Admin</p>
             <h1 className="text-white font-bold text-lg">{gym.name}</h1>
             <p className="text-white/60 text-xs mt-1">Plan actual: {plan.toUpperCase()}</p>
             {isPending && (
@@ -521,181 +461,65 @@ export function GymAdminPage({ initialTab }: Props) {
           </div>
 
           {activeTab === 'dashboard' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-[#111]">Dashboard</h2>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
                   <p className="text-2xl font-bold text-[#111]">{branches.length}</p>
-                  <p className="text-xs text-[#666] mt-1">Sucursales</p>
+                  <p className="text-xs text-[#666]">Sucursales</p>
                 </div>
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                  <p className="text-2xl font-bold text-[#111]">{discounts.filter((d) => d.active ?? d.is_active).length}</p>
-                  <p className="text-xs text-[#666] mt-1">Descuentos activos</p>
-                </div>
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
                   <p className="text-2xl font-bold text-[#111]">{plans.length}</p>
-                  <p className="text-xs text-[#666] mt-1">Planes internos</p>
+                  <p className="text-xs text-[#666]">Planes activos</p>
                 </div>
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                  <p className="text-2xl font-bold text-[#111]">{gym.current_count}</p>
-                  <p className="text-xs text-[#666] mt-1">Personas actuales</p>
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                  <p className="text-2xl font-bold text-[#111]">{discounts.length}</p>
+                  <p className="text-xs text-[#666]">Descuentos</p>
                 </div>
-              </div>
-              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="font-bold text-sm text-[#111]">Planes Gym</p>
-                  {plan !== 'free' && (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => persistBillingCycle('monthly')}
-                        className={`px-3 py-1 rounded text-xs font-bold ${billingCycle === 'monthly' ? 'bg-[#111] text-white' : 'bg-[#F5F5F5] text-[#666]'}`}
-                      >
-                        Mensual
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => persistBillingCycle('yearly')}
-                        className={`px-3 py-1 rounded text-xs font-bold ${billingCycle === 'yearly' ? 'bg-[#111] text-white' : 'bg-[#F5F5F5] text-[#666]'}`}
-                      >
-                        Anual
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="grid md:grid-cols-3 gap-3">
-                  {(['free', 'light', 'pro'] as GymPlanType[]).map((planId) => {
-                    const card = gymPlanCards[planId];
-                    const isCurrent = plan === planId;
-                    const useYearly = plan !== 'free' && billingCycle === 'yearly';
-                    const price = useYearly ? getAnnualPrice(card.monthly) : card.monthly;
-                    return (
-                      <div key={planId} className={`rounded-xl border p-4 ${isCurrent ? 'border-[#CC0000]' : 'border-[#E5E5E5]'}`}>
-                        <p className="font-bold text-sm text-[#111]">{card.name}</p>
-                        {planId === 'free' ? (
-                          <>
-                            <p className="text-[#CC0000] font-bold text-lg mt-1">{formatCLP(card.monthly)}</p>
-                            <p className="text-xs text-[#666]">mensual</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-[#CC0000] font-bold text-lg mt-1">{formatCLP(price)}</p>
-                            <p className="text-xs text-[#666]">{useYearly ? 'anual (10 meses)' : 'mensual'}</p>
-                            {useYearly && <p className="text-[11px] text-[#16A34A] font-bold mt-1">Ahorra 2 meses</p>}
-                          </>
-                        )}
-                        <ul className="mt-2 space-y-1">
-                          {card.benefits.map((benefit) => (
-                            <li key={benefit} className="text-xs text-[#666]">• {benefit}</li>
-                          ))}
-                        </ul>
-                        <button
-                          disabled={
-                            isCurrent &&
-                            (planId === 'free' || billingCycle === (gym?.billing_cycle ?? 'monthly'))
-                          }
-                          onClick={() => handleChangePlan(planId, billingCycle)}
-                          className={`mt-3 w-full py-2 rounded-lg text-sm font-bold ${
-                            isCurrent &&
-                            (planId === 'free' || billingCycle === (gym?.billing_cycle ?? 'monthly'))
-                              ? 'bg-[#F5F5F5] text-[#999]'
-                              : 'bg-[#CC0000] text-white'
-                          }`}
-                        >
-                          {isCurrent &&
-                          (planId === 'free' || billingCycle === (gym?.billing_cycle ?? 'monthly'))
-                            ? 'Plan actual'
-                            : 'Cambiar Plan'}
-                        </button>
-                      </div>
-                    );
-                  })}
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                  <p className="text-2xl font-bold text-green-600">{gym.current_count}</p>
+                  <p className="text-xs text-[#666]">Personas ahora</p>
                 </div>
               </div>
-            </div>
-          )}
 
-          {activeTab === 'mi_gym' && (
-            <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3">
-              <h3 className="font-bold text-[#111] text-sm">Mi Gym</h3>
-              <div>
-                <p className="text-[10px] font-bold text-[#999] uppercase tracking-wider">Cadena</p>
-                <p className="text-sm text-[#111] font-medium">{gym.name}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-[#999] uppercase tracking-wider mb-1">Sucursales</p>
-                {branches.length === 0 ? (
-                  <p className="text-xs text-[#999]">Sin sucursales registradas.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {branches.map((b) => (
-                      <li key={b.id} className="text-sm text-[#666] border-b border-[#F5F5F5] pb-2 last:border-0 last:pb-0">
-                        <span className="font-medium text-[#111]">{b.name}</span>
-                        {b.address ? <span className="block text-xs text-[#999] mt-0.5">{b.address}</span> : null}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <p className="text-xs text-[#999]">Dirección sede principal: {gym.address || '—'}</p>
-              {canManageBranches && branches.length < maxBranchesCap ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const name = typeof window !== 'undefined' ? window.prompt('Nombre de la sucursal') : null;
-                    if (!name?.trim() || !gym?.id) return;
-                    await supabase.from('gym_branches').insert({ gym_id: gym.id, name: name.trim() });
-                    await fetchAll();
-                  }}
-                  className="w-full py-2 border-2 border-dashed border-[#E5E5E5] rounded-xl text-[#666] text-sm flex items-center justify-center gap-1"
-                >
-                  <Plus size={16} /> Agregar sucursal
-                </button>
-              ) : canManageBranches ? (
-                <p className="text-xs text-[#999] text-center">Límite de sucursales alcanzado ({maxBranchesCap}).</p>
-              ) : (
-                <p className="text-xs text-[#999] text-center">Actualiza a Light o Pro para gestionar sucursales.</p>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'sensor' && (
-            <div className="space-y-3">
-              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  {gym.sensor_online ? (
-                    <>
-                      <span className="w-3 h-3 rounded-full bg-[#16A34A] animate-pulse" />
-                      <span className="text-[#16A34A] font-bold text-sm">Sensor activo</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-3 h-3 rounded-full bg-[#CC0000]" />
-                      <span className="text-[#CC0000] font-bold text-sm">Sensor sin conexión</span>
-                    </>
-                  )}
-                </div>
-                <p className="text-xs text-[#666]">
-                  Última señal: {gym.last_sensor_ping ? timeAgo(gym.last_sensor_ping) : 'Sin señales'}
-                </p>
-              </div>
-              <OccupancyGauge
-                percentage={gym.occupancy_percentage}
-                status={gym.occupancy_status}
-                peopleCount={gym.current_count}
-                sensorOnline={gym.sensor_online}
-                lastSensorPing={gym.last_sensor_ping}
-                compact
-              />
               {todayLogs.length > 0 && (
                 <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
-                  <p className="text-xs text-[#666] mb-2">Registros recientes</p>
-                  <div className="space-y-1">
-                    {todayLogs.slice(0, 8).map((log) => (
-                      <div key={log.id} className="text-xs text-[#666] flex justify-between">
-                        <span>{new Date(log.recorded_at).toLocaleTimeString('es-CL')}</span>
-                        <span>{Math.round(log.occupancy_percentage)}%</span>
-                      </div>
-                    ))}
+                  <h3 className="font-bold text-[#111] text-sm mb-3">Ocupación hoy</h3>
+                  <div className="h-32 relative">
+                    <svg className="w-full h-full" viewBox="0 0 300 120" preserveAspectRatio="none">
+                      <line x1="0" y1="0" x2="300" y2="0" stroke="#E5E5E5" strokeWidth="0.5" />
+                      <line x1="0" y1="40" x2="300" y2="40" stroke="#E5E5E5" strokeWidth="0.5" />
+                      <line x1="0" y1="80" x2="300" y2="80" stroke="#E5E5E5" strokeWidth="0.5" />
+                      <line x1="0" y1="120" x2="300" y2="120" stroke="#E5E5E5" strokeWidth="0.5" />
+                      {todayLogs.length > 1 && (
+                        <>
+                          <polygon
+                            points={
+                              todayLogs
+                                .map((log, i) => `${(i / (todayLogs.length - 1)) * 300},${120 - (log.occupancy_percentage / 100) * 120}`)
+                                .join(' ') + ' 300,120 0,120'
+                            }
+                            fill="url(#chartGradient)"
+                            opacity="0.3"
+                          />
+                          <polyline
+                            points={todayLogs
+                              .map((log, i) => `${(i / (todayLogs.length - 1)) * 300},${120 - (log.occupancy_percentage / 100) * 120}`)
+                              .join(' ')}
+                            fill="none"
+                            stroke="#CC0000"
+                            strokeWidth="2"
+                          />
+                        </>
+                      )}
+                      <defs>
+                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#CC0000" />
+                          <stop offset="100%" stopColor="#CC0000" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
                   </div>
                 </div>
               )}
@@ -715,7 +539,7 @@ export function GymAdminPage({ initialTab }: Props) {
 
           {activeTab === 'planes' && (
             <div className="space-y-3">
-              <p className="text-xs text-[#666]">Gestiona planes y promociones del gym.</p>
+              <p className="text-xs text-[#666]">Gestiona los planes internos que ofreces en el gym (precios regular / premium).</p>
               {plans.map((p) => (
                 <div key={p.id} className="bg-white rounded-xl border border-[#E5E5E5] p-3 flex items-center justify-between">
                   <div>
@@ -738,16 +562,15 @@ export function GymAdminPage({ initialTab }: Props) {
               ) : (
                 <p className="text-xs text-[#999] text-center py-2">Plan Light o Pro requerido para editar planes internos.</p>
               )}
-              {canSeePromotions ? (
-                <GymPromotionsTab gymId={gym.id} promotions={promotions} onRefresh={fetchAll} />
-              ) : (
-                <p className="text-xs text-[#999]">Las promociones avanzadas están disponibles en el plan Pro.</p>
-              )}
             </div>
           )}
 
-          {activeTab === 'descuentos' && (
+          {activeTab === 'descuentos_promociones' && (
             <div className="space-y-3">
+              <div className="mb-3">
+                <h3 className="text-sm font-bold text-[#111] mb-1">Descuentos y Promociones</h3>
+                <p className="text-xs text-[#666]">Crea cupones que usuarios premium pueden descargar y usar en tu gym.</p>
+              </div>
               {!canManageDiscounts && (
                 <p className="text-xs text-[#666] bg-amber-50 border border-amber-100 rounded-lg p-3">
                   Tu plan actual no incluye creación de descuentos. Actualiza a Light o Pro para gestionarlos.
@@ -811,98 +634,95 @@ export function GymAdminPage({ initialTab }: Props) {
                   </div>
                 </div>
               ) : null}
-            </div>
-          )}
 
-          {activeTab === 'metricas' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                  <p className="text-2xl font-bold text-[#111]">{couponUsage.length}</p>
-                  <p className="text-xs text-[#666] mt-1">Cupones usados</p>
-                </div>
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                  <p className="text-2xl font-bold text-[#111]">{new Set(couponUsage.map((row) => row.branch_id).filter(Boolean)).size}</p>
-                  <p className="text-xs text-[#666] mt-1">Sucursales con uso</p>
-                </div>
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                  <p className="text-2xl font-bold text-[#111]">{new Set(couponUsage.map((row) => row.type).filter(Boolean)).size}</p>
-                  <p className="text-xs text-[#666] mt-1">Tipos de canje</p>
-                </div>
-                <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
-                  <p className="text-2xl font-bold text-[#111]">{formatCLP(couponUsage.reduce((acc, row) => acc + Number(row.amount || 0), 0))}</p>
-                  <p className="text-xs text-[#666] mt-1">Monto descuentos</p>
-                </div>
-              </div>
-              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-2">
-                {couponUsage.slice(0, 20).map((row) => (
-                  <div key={row.id} className="text-xs text-[#666] flex items-center justify-between border-b border-[#F5F5F5] pb-1">
-                    <span>{row.type || 'tipo'}</span>
-                    <span>{row.branch_id ? `Sucursal ${row.branch_id.slice(0, 6)}` : 'Principal'}</span>
-                    <span>{formatCLP(Number(row.amount || 0))}</span>
-                  </div>
-                ))}
-                {couponUsage.length === 0 && <p className="text-xs text-[#999]">Sin uso de cupones todavía.</p>}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'estadisticas_basicas' && (
-            <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-sm text-[#666]">
-              <p>Sucursales: {branches.length}</p>
-              <p>Descuentos activos: {discounts.filter((d) => d.active ?? d.is_active).length}</p>
-              <p>Promociones activas: {promotions.filter((p) => p.is_active).length}</p>
-            </div>
-          )}
-
-          {activeTab === 'analytics_pro' && (
-            <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-sm text-[#666]">
-              Analytics Pro disponible para comparar rendimiento entre sucursales.
-            </div>
-          )}
-
-          {activeTab === 'notificaciones' && (
-            <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-sm text-[#666]">
-              Centro de notificaciones del gym.
-            </div>
-          )}
-
-          {activeTab === 'perfil' && (
-            <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-[#111]">Perfil</h3>
-                {canEditInfo && !editingInfo ? (
-                  <button type="button" onClick={() => setEditingInfo(true)} className="px-3 py-1.5 border border-[#111111] text-[#111111] font-bold rounded-lg text-xs">
-                    Editar
-                  </button>
-                ) : null}
-              </div>
-              {editingInfo ? (
-                <div className="space-y-2">
-                  <input placeholder="Nombre del gym" value={infoForm.name} onChange={(e) => setInfoForm((p) => ({ ...p, name: e.target.value }))} className={inp} />
-                  <input placeholder="Dirección" value={infoForm.address} onChange={(e) => setInfoForm((p) => ({ ...p, address: e.target.value }))} className={inp} />
-                  <input placeholder="Comuna" value={infoForm.comuna} onChange={(e) => setInfoForm((p) => ({ ...p, comuna: e.target.value }))} className={inp} />
-                  <input placeholder="Teléfono" value={infoForm.phone} onChange={(e) => setInfoForm((p) => ({ ...p, phone: e.target.value }))} className={inp} />
-                  <input placeholder="Sitio web" value={infoForm.website} onChange={(e) => setInfoForm((p) => ({ ...p, website: e.target.value }))} className={inp} />
-                  <textarea rows={3} placeholder="Descripción" value={infoForm.description} onChange={(e) => setInfoForm((p) => ({ ...p, description: e.target.value }))} className={`${inp} resize-none`} />
-                  <div className="flex gap-2">
-                    <button onClick={saveGymInfo} className="flex-1 py-2 bg-[#CC0000] text-white font-bold rounded-lg text-sm">Guardar</button>
-                    <button onClick={() => setEditingInfo(false)} className="flex-1 py-2 border border-[#E5E5E5] rounded-lg text-sm">Cancelar</button>
-                  </div>
-                </div>
+              {canSeePromotions ? (
+                <GymPromotionsTab gymId={gym.id} promotions={promotions} onRefresh={fetchAll} />
               ) : (
-                <div className="space-y-1">
-                  <p className="text-sm text-[#666]">{gym.name}</p>
-                  <p className="text-sm text-[#666]">{gym.address || '—'}</p>
-                  <p className="text-sm text-[#666]">{gym.comuna || '—'}</p>
-                  <p className="text-sm text-[#666]">{gym.phone || '—'}</p>
-                  <p className="text-sm text-[#666]">{gym.website || '—'}</p>
-                </div>
+                <p className="text-xs text-[#999]">Las promociones están disponibles en plan Light o Pro.</p>
               )}
             </div>
           )}
 
-          {activeTab === 'mi_plan' && (
+          {activeTab === 'validar_qr' && (
+            <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-3">
+              <h3 className="text-sm font-bold text-[#111]">Validar cupón / QR</h3>
+              <p className="text-xs text-[#666]">Ingresa el código del cupón para comprobar si existe y está activo en tu gym.</p>
+              <input
+                type="text"
+                value={validarCodigoInput}
+                onChange={(e) => setValidarCodigoInput(e.target.value)}
+                placeholder="Ej: GF-xxxxx"
+                className={inp}
+              />
+              <button type="button" onClick={() => void validarCodigoCupom()} className="w-full py-2 bg-[#CC0000] text-white text-sm font-bold rounded-lg">
+                Validar código
+              </button>
+            </div>
+          )}
+
+          {activeTab === 'metricas' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-[#111]">Métricas y Estadísticas</h2>
+              <p className="text-sm text-[#666]">Próximamente: Analytics avanzados, reportes y estadísticas detalladas.</p>
+            </div>
+          )}
+
+          {activeTab === 'perfil' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-[#111]">Perfil del Gimnasio</h2>
+
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                {editingInfo ? (
+                  <div className="space-y-2">
+                    <input placeholder="Nombre del gym" value={infoForm.name} onChange={(e) => setInfoForm((p) => ({ ...p, name: e.target.value }))} className={inp} />
+                    <input placeholder="Dirección" value={infoForm.address} onChange={(e) => setInfoForm((p) => ({ ...p, address: e.target.value }))} className={inp} />
+                    <select value={infoForm.comuna} onChange={(e) => setInfoForm((p) => ({ ...p, comuna: e.target.value }))} className={inp}>
+                      <option value="">Seleccionar comuna</option>
+                      {COMUNAS.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <input placeholder="Teléfono" value={infoForm.phone} onChange={(e) => setInfoForm((p) => ({ ...p, phone: e.target.value }))} className={inp} />
+                    <input placeholder="Sitio web" value={infoForm.website} onChange={(e) => setInfoForm((p) => ({ ...p, website: e.target.value }))} className={inp} />
+                    <textarea rows={3} placeholder="Descripción" value={infoForm.description} onChange={(e) => setInfoForm((p) => ({ ...p, description: e.target.value }))} className={`${inp} resize-none`} />
+                    <div className="flex gap-2 pt-1">
+                      <button type="button" onClick={() => void saveGymInfo()} className="flex-1 py-2 bg-[#CC0000] text-white font-bold rounded-lg text-sm">
+                        Guardar
+                      </button>
+                      <button type="button" onClick={() => setEditingInfo(false)} className="flex-1 py-2 border border-[#E5E5E5] rounded-lg text-sm">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-[#111]">Información</h3>
+                      {canEditInfo ? (
+                        <button type="button" onClick={() => setEditingInfo(true)} className="px-3 py-1.5 border border-[#111] text-[#111] font-bold rounded-lg text-xs">
+                          Editar
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-[#111]">{gym.name}</p>
+                      <p className="text-sm text-[#666]">
+                        {gym.address}
+                        {gym.comuna ? `, ${gym.comuna}` : ''}
+                      </p>
+                      {gym.phone ? <p className="text-sm text-[#666]">{gym.phone}</p> : null}
+                      {gym.website ? <p className="text-sm text-[#CC0000]">{gym.website}</p> : null}
+                      {gym.description ? <p className="text-sm text-[#666] mt-1">{gym.description}</p> : null}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'actualizar_plan' && (
             <div className="space-y-4">
               {isPending && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
@@ -911,7 +731,7 @@ export function GymAdminPage({ initialTab }: Props) {
                     <p className="font-bold text-sm text-amber-900">Perfil pendiente de aprobación</p>
                   </div>
                   <p className="text-xs text-amber-800">
-                    No puedes cambiar de plan hasta que FluxFit apruebe tu perfil. Esto sucede dentro de 24-48 horas hábiles.
+                    No puedes cambiar de plan hasta que GoFitNow apruebe tu perfil. Esto sucede dentro de 24-48 horas hábiles.
                   </p>
                 </div>
               )}

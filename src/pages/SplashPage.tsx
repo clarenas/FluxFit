@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FluxFitLogo } from '../components/FluxFitLogo';
+import { GoFitNowLogo } from '../components/GoFitNowLogo';
 import { supabase } from '../lib/supabase';
 
 export function SplashPage() {
@@ -25,7 +25,7 @@ export function SplashPage() {
       <div className={`transition-all duration-700 ${
         visible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
       }`}>
-        <FluxFitLogo size="lg" />
+        <GoFitNowLogo size="lg" />
       </div>
     </div>
   );

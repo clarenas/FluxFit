@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Star, TrendingUp, Tag } from 'lucide-react';
-import { FluxFitLogo } from '../components/FluxFitLogo';
+import { GoFitNowLogo } from '../components/GoFitNowLogo';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { formatCLP } from '../lib/utils';
@@ -63,7 +63,7 @@ const COMMERCE_PLANS = [
     price: 39900,
     features: [
       '1 cupón activo',
-      'Perfil visible en FluxFit',
+      'Perfil visible en GoFitNow',
       'Métricas básicas de visualización',
     ],
   },
@@ -144,9 +144,9 @@ export function PremiumPage() {
   const [currentPlan, setCurrentPlan] = useState<string>('free');
   const [requestSent, setRequestSent] = useState<string | null>(null);
   const [requesting, setRequesting] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'perfil' | 'descuentos-fluxfit'>('perfil');
+  const [activeTab, setActiveTab] = useState<'perfil' | 'descuentos-gofitnow'>('perfil');
 
-  // Revenue data for fluxfit_admin
+  // Revenue data for platform super-admin
   const [adminRevenue, setAdminRevenue] = useState<{
     gymRevenue: number; commerceRevenue: number; premiumUsers: number; totalRedemptions: number;
   } | null>(null);
@@ -173,9 +173,9 @@ export function PremiumPage() {
     }
   }, [user, role, isPremium]);
 
-  // Load revenue metrics for fluxfit_admin
+  // Load revenue metrics for platform super-admin
   useEffect(() => {
-    if (role !== 'fluxfit_admin') return;
+    if (role !== 'gofitnow_admin') return;
     const PRICES: Record<string, number> = { light: 89900, pro: 149900, full: 149900, basico: 59900, basic: 39900, premium_commerce: 69900 };
     Promise.all([
       supabase.from('gym_subscriptions').select('plan, status'),
@@ -217,8 +217,8 @@ export function PremiumPage() {
     navigate('/auth');
   };
 
-  // ── FluxFit Admin: revenue dashboard (no payment options) ──────────────────
-  if (role === 'fluxfit_admin') {
+  // ── GoFitNow Admin: revenue dashboard (no payment options) ──────────────────
+  if (role === 'gofitnow_admin') {
     const total = (adminRevenue?.gymRevenue ?? 0) + (adminRevenue?.commerceRevenue ?? 0) + (adminRevenue?.premiumUsers ?? 0) * 2990;
     return (
       <div className="min-h-screen bg-[#F5F5F5] pb-20">
@@ -226,7 +226,7 @@ export function PremiumPage() {
           <div className="flex items-center gap-3">
             <TrendingUp size={28} className="text-[#CC0000]" />
             <div>
-              <p className="text-white/60 text-xs">FluxFit Admin</p>
+              <p className="text-white/60 text-xs">GoFitNow Admin</p>
               <h1 className="text-white font-bold text-xl">Ingresos de la Red</h1>
             </div>
           </div>
@@ -268,8 +268,8 @@ export function PremiumPage() {
       <div className="min-h-screen bg-[#F5F5F5] pb-20">
         <Toast {...toast} />
         <div className="bg-[#CC0000] px-4 pt-12 pb-8 text-center">
-          <FluxFitLogo size="sm" />
-          <h1 className="text-white font-bold text-2xl mt-4">FluxFit Premium</h1>
+          <GoFitNowLogo size="sm" />
+          <h1 className="text-white font-bold text-2xl mt-4">GoFitNow Premium</h1>
           <p className="text-white/80 text-sm mt-2">Crea tu cuenta para activar todos los beneficios</p>
         </div>
         <div className="px-4 mt-6">
@@ -292,7 +292,7 @@ export function PremiumPage() {
       <div className="min-h-screen bg-[#F5F5F5] pb-20">
         <Toast {...toast} />
         <div className="bg-[#111111] px-4 pt-12 pb-6">
-          <p className="text-white/60 text-xs">FluxFit para Gyms</p>
+          <p className="text-white/60 text-xs">GoFitNow para Gyms</p>
           <h1 className="text-white font-bold text-2xl mt-1">Planes B2B</h1>
         </div>
         <div className="px-4 pt-4 space-y-4">
@@ -325,7 +325,7 @@ export function PremiumPage() {
       <div className="min-h-screen bg-[#F5F5F5] pb-20">
         <Toast {...toast} />
         <div className="bg-[#111111] px-4 pt-12 pb-6">
-          <p className="text-white/60 text-xs">FluxFit para Comercios</p>
+          <p className="text-white/60 text-xs">GoFitNow para Comercios</p>
           <h1 className="text-white font-bold text-2xl mt-1">Planes B2B</h1>
         </div>
         <div className="px-4 pt-4 space-y-4">
@@ -357,8 +357,8 @@ export function PremiumPage() {
     <div className="min-h-screen bg-[#F5F5F5] pb-20">
       <Toast {...toast} />
       <div className="bg-[#CC0000] px-4 pt-12 pb-8 text-center">
-        <FluxFitLogo size="sm" />
-        <h1 className="text-white font-bold text-2xl mt-4">FluxFit Premium</h1>
+        <GoFitNowLogo size="sm" />
+        <h1 className="text-white font-bold text-2xl mt-4">GoFitNow Premium</h1>
         <p className="text-white/80 text-sm mt-1">{formatCLP(2990)}/mes · Cancela cuando quieras</p>
       </div>
       <div className="px-4 -mt-2 pt-4 space-y-4">
@@ -376,17 +376,17 @@ export function PremiumPage() {
                 <span>Perfil</span>
               </button>
 
-              {/* Descuentos FluxFit */}
+              {/* Descuentos GoFitNow */}
               <button
-                onClick={() => setActiveTab('descuentos-fluxfit')}
+                onClick={() => setActiveTab('descuentos-gofitnow')}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  activeTab === 'descuentos-fluxfit'
+                  activeTab === 'descuentos-gofitnow'
                     ? 'bg-[#CC0000] text-white'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <Tag className="w-5 h-5" />
-                <span>Descuentos FluxFit</span>
+                <span>Descuentos GoFitNow</span>
               </button>
 
               <button
@@ -409,9 +409,9 @@ export function PremiumPage() {
                 </div>
               )}
 
-              {activeTab === 'descuentos-fluxfit' && (
+              {activeTab === 'descuentos-gofitnow' && (
                 <div className="space-y-6 bg-white border border-[#E5E5E5] rounded-2xl p-5">
-                  <h1 className="text-3xl font-bold">Descuentos FluxFit</h1>
+                  <h1 className="text-3xl font-bold">Descuentos GoFitNow</h1>
                   <p className="text-gray-600">
                     Próximamente: cupones de descuento de gyms y comercios adheridos
                   </p>

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { User, Building2, Store, Clock } from 'lucide-react';
-import { FluxFitLogo } from '../components/FluxFitLogo';
+import { GoFitNowLogo } from '../components/GoFitNowLogo';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -169,7 +169,7 @@ export function AuthPage() {
 
   // Redirect to role-appropriate home immediately after login — no flash
   const roleHome = (role: string | undefined) => {
-    if (role === 'fluxfit_admin') return '/admin/fluxfit';
+    if (role === 'gofitnow_admin') return '/admin/gofitnow';
     if (role === 'gym_admin') return '/gym-admin';
     if (role === 'commerce_admin') return '/admin/commerce';
     return '/home';
@@ -196,7 +196,7 @@ export function AuthPage() {
     if (resetSuccess) {
       return (
         <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
-          <FluxFitLogo size="sm" />
+          <GoFitNowLogo size="sm" />
           <div className="mt-8 w-full max-w-xs text-center">
             <div className="w-14 h-14 rounded-full bg-[#16A34A]/10 flex items-center justify-center mx-auto mb-4">
               <svg className="w-7 h-7 text-[#16A34A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,7 +216,7 @@ export function AuthPage() {
     }
     return (
       <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12">
-        <FluxFitLogo size="sm" />
+        <GoFitNowLogo size="sm" />
         <h1 className="text-xl font-bold text-[#111111] mt-6 mb-6">Nueva contraseña</h1>
         <form
           onSubmit={async (e) => {
@@ -254,7 +254,7 @@ export function AuthPage() {
   if (awaitingConfirmation && !user) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
-        <FluxFitLogo size="sm" />
+        <GoFitNowLogo size="sm" />
         <div className="mt-8 w-full max-w-xs text-center">
           <div className="w-14 h-14 rounded-full bg-[#CC0000]/10 flex items-center justify-center mx-auto mb-4">
             <svg className="w-7 h-7 text-[#CC0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -279,7 +279,7 @@ export function AuthPage() {
   if (gymRequestSent) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
-        <FluxFitLogo size="sm" />
+        <GoFitNowLogo size="sm" />
         <div className="mt-8 w-full max-w-xs text-center">
           <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
             <Clock size={28} className="text-amber-500" />
@@ -303,7 +303,7 @@ export function AuthPage() {
     if (recoverySuccess) {
       return (
         <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
-          <FluxFitLogo size="sm" />
+          <GoFitNowLogo size="sm" />
           <div className="mt-8 w-full max-w-xs text-center">
             <div className="w-14 h-14 rounded-full bg-[#CC0000]/10 flex items-center justify-center mx-auto mb-4">
               <svg className="w-7 h-7 text-[#CC0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,7 +325,7 @@ export function AuthPage() {
     }
     return (
       <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12">
-        <FluxFitLogo size="sm" />
+        <GoFitNowLogo size="sm" />
         <h1 className="text-xl font-bold text-[#111111] mt-6 mb-6">Recuperar contraseña</h1>
         <form
           onSubmit={async (e) => {
@@ -358,7 +358,7 @@ export function AuthPage() {
   if (isLogin) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12">
-        <FluxFitLogo size="sm" />
+        <GoFitNowLogo size="sm" />
         <h1 className="text-xl font-bold text-[#111111] mt-6 mb-6">Inicia sesión</h1>
         <form
           onSubmit={async (e) => {
@@ -404,6 +404,8 @@ export function AuthPage() {
                 });
                 resolvedRole = 'commerce_admin';
               }
+
+              if (resolvedRole === 'fluxfit_admin') resolvedRole = 'gofitnow_admin';
 
               navigate(roleHome(resolvedRole), { replace: true });
             }
@@ -466,8 +468,8 @@ export function AuthPage() {
   if (accountType === null) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12">
-        <FluxFitLogo size="sm" />
-        <h1 className="text-xl font-bold text-[#111111] mt-6 mb-2">¿Cómo quieres usar FluxFit?</h1>
+        <GoFitNowLogo size="sm" />
+        <h1 className="text-xl font-bold text-[#111111] mt-6 mb-2">¿Cómo quieres usar GoFitNow?</h1>
         <p className="text-sm text-[#666666] mb-8">Elige el tipo de cuenta para continuar</p>
         <div className="w-full max-w-xs space-y-3">
           <button
@@ -494,7 +496,7 @@ export function AuthPage() {
               </div>
               <div>
                 <p className="font-bold text-[#111111] text-sm mb-1">Tengo un gym</p>
-                <p className="text-xs text-[#666666] leading-relaxed">Registra tu gimnasio y llega a más clientes con FluxFit</p>
+                <p className="text-xs text-[#666666] leading-relaxed">Registra tu gimnasio y llega a más clientes con GoFitNow</p>
               </div>
             </div>
           </button>
@@ -508,7 +510,7 @@ export function AuthPage() {
               </div>
               <div>
                 <p className="font-bold text-[#111111] text-sm mb-1">Tengo un comercio</p>
-                <p className="text-xs text-[#666666] leading-relaxed">Ofrece descuentos exclusivos a los usuarios premium de FluxFit</p>
+                <p className="text-xs text-[#666666] leading-relaxed">Ofrece descuentos exclusivos a los usuarios premium de GoFitNow</p>
               </div>
             </div>
           </button>
@@ -527,7 +529,7 @@ export function AuthPage() {
   if (accountType === 'usuario') {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12">
-        <FluxFitLogo size="sm" />
+        <GoFitNowLogo size="sm" />
         <h1 className="text-xl font-bold text-[#111111] mt-6 mb-6">Crea tu cuenta</h1>
         <form
           onSubmit={async (e) => {
@@ -585,7 +587,7 @@ export function AuthPage() {
     };
     return (
       <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12 pb-12">
-        <FluxFitLogo size="sm" />
+        <GoFitNowLogo size="sm" />
         <h1 className="text-xl font-bold text-[#111111] mt-6 mb-6">Registra tu gym</h1>
         <form
           onSubmit={async (e) => {
@@ -673,7 +675,7 @@ export function AuthPage() {
   // ── Register: comercio ──
   return (
     <div className="min-h-screen bg-white flex flex-col items-center px-6 pt-12 pb-12">
-      <FluxFitLogo size="sm" />
+      <GoFitNowLogo size="sm" />
       <h1 className="text-xl font-bold text-[#111111] mt-6 mb-6">Registra tu comercio</h1>
       <form
         onSubmit={async (e) => {

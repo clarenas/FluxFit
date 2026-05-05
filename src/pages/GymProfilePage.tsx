@@ -84,7 +84,7 @@ export function GymProfilePage() {
   const handleShare = async () => {
     const url = window.location.href;
     if (navigator.share) {
-      await navigator.share({ title: gym?.name ?? '', text: `Mira este gym en FluxFit: ${gym?.name ?? ''}`, url });
+      await navigator.share({ title: gym?.name ?? '', text: `Mira este gym en GoFitNow: ${gym?.name ?? ''}`, url });
     } else {
       await navigator.clipboard.writeText(url);
       showToast('Link copiado al portapapeles', 'info');
@@ -270,9 +270,9 @@ export function GymProfilePage() {
                   <h4 className="font-bold text-[#111111]">{plan.name}</h4>
                   <div className="mt-2 space-y-1">
                     {!isPremium ? (
-                      <><p className="text-sm text-[#111111]">Regular: {formatCLP(plan.regular_price)}/mes</p><p className="text-sm text-[#999]">✦ Premium: {formatCLP(plan.premium_price)}/mes 🔒</p><p className="text-xs text-[#999]">Con membresía FluxFit</p></>
+                      <><p className="text-sm text-[#111111]">Regular: {formatCLP(plan.regular_price)}/mes</p><p className="text-sm text-[#999]">✦ Premium: {formatCLP(plan.premium_price)}/mes 🔒</p><p className="text-xs text-[#999]">Con membresía GoFitNow</p></>
                     ) : (
-                      <><p className="text-sm text-[#999] line-through">Regular: {formatCLP(plan.regular_price)}/mes</p><p className="text-sm text-[#16A34A] font-bold">Tu precio: {formatCLP(plan.premium_price)}/mes</p><span className="inline-block bg-[#CC0000] text-white text-xs font-bold px-2 py-0.5 rounded-full mt-1">✦ Precio FluxFit</span></>
+                      <><p className="text-sm text-[#999] line-through">Regular: {formatCLP(plan.regular_price)}/mes</p><p className="text-sm text-[#16A34A] font-bold">Tu precio: {formatCLP(plan.premium_price)}/mes</p><span className="inline-block bg-[#CC0000] text-white text-xs font-bold px-2 py-0.5 rounded-full mt-1">✦ Precio GoFitNow</span></>
                     )}
                   </div>
                   {plan.features.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{plan.features.map((f, i) => <span key={i} className="text-xs bg-[#F5F5F5] text-[#666666] px-2 py-0.5 rounded-full">{f}</span>)}</div>}
@@ -329,7 +329,7 @@ export function GymProfilePage() {
       </div>
 
       <BottomSheet open={!!selectedPlan} onClose={() => setSelectedPlan(null)} title={selectedPlan?.name}>
-        {selectedPlan && <div className="space-y-3"><p className="text-sm text-[#666666]">{selectedPlan.description}</p><p className="text-sm text-[#666666]">Para contratar este plan preséntate en recepción o visita <a href={gym.website} target="_blank" rel="noopener noreferrer" className="text-[#CC0000] underline">{gym.website || 'el sitio web del gym'}</a> mostrando tu membresía FluxFit activa.</p></div>}
+        {selectedPlan && <div className="space-y-3"><p className="text-sm text-[#666666]">{selectedPlan.description}</p><p className="text-sm text-[#666666]">Para contratar este plan preséntate en recepción o visita <a href={gym.website} target="_blank" rel="noopener noreferrer" className="text-[#CC0000] underline">{gym.website || 'el sitio web del gym'}</a> mostrando tu membresía GoFitNow activa.</p></div>}
       </BottomSheet>
 
       <BottomSheet open={!!selectedService} onClose={() => setSelectedService(null)} title={selectedService?.name}>
