@@ -19,7 +19,7 @@ import { SensorInventoryPage } from './pages/SensorInventoryPage';
 // Resolves where an authenticated user should land when hitting "/"
 function roleHome(role: string | undefined): string {
   if (role === 'fluxfit_admin') return '/admin/fluxfit';
-  if (role === 'gym_admin') return '/admin/gym';
+  if (role === 'gym_admin') return '/gym-admin';
   if (role === 'commerce_admin') return '/admin/commerce';
   return '/home';
 }
@@ -99,6 +99,9 @@ function AppShell() {
             <Route path="/premium" element={<AuthGuard><PremiumPage /></AuthGuard>} />
 
             {/* Gym admin routes — role-gated */}
+            <Route path="/gym-admin"          element={<RoleGuard role="gym_admin"><GymAdminPage /></RoleGuard>} />
+            <Route path="/gym-admin/discounts" element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="descuentos" /></RoleGuard>} />
+            <Route path="/gym-admin/plan"     element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="mi_plan" /></RoleGuard>} />
             <Route path="/admin/gym"          element={<RoleGuard role="gym_admin"><GymAdminPage /></RoleGuard>} />
             <Route path="/admin/gym/branches" element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="sucursales" /></RoleGuard>} />
             <Route path="/admin/gym/offers"   element={<RoleGuard role="gym_admin"><GymAdminPage initialTab="planes" /></RoleGuard>} />

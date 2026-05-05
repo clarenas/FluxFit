@@ -39,6 +39,9 @@ export interface Gym {
   sensor_key: string;
   is_active: boolean;
   approval_status: 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string | null;
+  plan?: 'free' | 'light' | 'pro';
+  billing_cycle?: 'monthly' | 'yearly';
   created_at: string;
 }
 
@@ -77,11 +80,19 @@ export interface GymService {
 export interface GymDiscount {
   id: string;
   gym_id: string;
+  branch_id?: string | null;
+  title?: string;
+  type?: 'plan_gym' | 'nutricion' | 'evaluacion_corporal' | 'personal_training' | string;
   description: string;
+  discount_value?: number;
+  active?: boolean;
   regular_value: string;
   premium_value: string;
   discount_percentage: number;
   is_active: boolean;
+  coupon_code?: string;
+  qr_payload?: string;
+  created_at?: string;
 }
 
 export interface GymRecommendedHour {

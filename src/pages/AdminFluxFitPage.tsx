@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, X, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Building2, Store, ShoppingBag, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { getRoleBadge } from '../lib/utils';
+import { formatCLP, getRoleBadge } from '../lib/utils';
 import { useToast } from '../hooks/useToast';
 import { Toast } from '../components/Toast';
 
@@ -35,6 +35,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [requests, setRequests] = useState<any[]>([]);
   const [commerces, setCommerces] = useState<any[]>([]);
   const [redemptions, setRedemptions] = useState<any[]>([]);
+  const [couponUsage, setCouponUsage] = useState<any[]>([]);
   const [sensors, setSensors] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [sensorHistory, setSensorHistory] = useState<any[]>([]);
@@ -97,13 +98,14 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes, sensorsRes, branchesRes, sensorHistoryRes] = await Promise.all([
+    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes, couponUsageRes, sensorsRes, branchesRes, sensorHistoryRes] = await Promise.all([
       supabase.from('gyms').select('*, gym_subscriptions(plan,plan_price,status,valid_until), gym_branches(id), gym_admins(id)').order('name'),
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('contact_messages').select('*').order('created_at', { ascending: false }),
       supabase.from('gym_admin_requests').select('*, users(email,full_name,role)').order('created_at', { ascending: false }),
       supabase.from('commerces').select('*, commerce_subscriptions(plan,status,valid_until)').order('name'),
       supabase.from('coupon_redemptions').select('*').order('redeemed_at', { ascending: false }),
+      supabase.from('coupon_usage').select('*').order('used_at', { ascending: false }),
       supabase
         .from('sensor_kits')
         .select('*, gym_branches(name, gym_id, gyms(name)), sensors(id, position, serial_number, status, last_heartbeat, secret_key, brand, model, installation_date)')
@@ -131,6 +133,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     setRequests(requestsRes.data ?? []);
     setCommerces(commercesRes.data ?? []);
     setRedemptions(redemptionsRes.data ?? []);
+    setCouponUsage(couponUsageRes.data ?? []);
     setSensors(sensorsRes.data ?? []);
     setBranches(branchesRes.data ?? []);
     setSensorHistory(sensorHistoryRes.data ?? []);
@@ -303,6 +306,48 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     if (!window.confirm(`¿Confirmas ${action} a "${gym.name}"?`)) return;
     await supabase.from('gyms').update({ is_active: !gym.is_active }).eq('id', gym.id);
     showToast(`Gym ${gym.is_active ? 'dado de baja' : 'dado de alta'} correctamente`, 'success');
+    fetchAll();
+  };
+
+  const approveExistingGym = async (gymId: string) => {
+    const confirmed = window.confirm('¿Aprobar este gym? Será visible para usuarios.');
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('gyms')
+      .update({
+        approval_status: 'approved',
+        is_active: true,
+      })
+      .eq('id', gymId);
+
+    if (error) {
+      showToast('Error al aprobar gym', 'error');
+      return;
+    }
+
+    showToast('Gym aprobado exitosamente', 'success');
+    fetchAll();
+  };
+
+  const rejectExistingGym = async (gymId: string) => {
+    const confirmed = window.confirm('¿Rechazar este gym? Se marcará como inactivo.');
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('gyms')
+      .update({
+        approval_status: 'rejected',
+        is_active: false,
+      })
+      .eq('id', gymId);
+
+    if (error) {
+      showToast('Error al rechazar gym', 'error');
+      return;
+    }
+
+    showToast('Gym rechazado', 'success');
     fetchAll();
   };
 
@@ -583,7 +628,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
       } else {
         const { data: createdGym, error: gymErr } = await supabase
           .from('gyms')
-          .insert({ ...gymPayload, is_active: true })
+          .insert({ ...gymPayload, is_active: true, approval_status: 'approved' })
           .select('id')
           .single();
         if (gymErr) throw gymErr;
@@ -596,6 +641,10 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
           status: gymForm.plan === 'free' ? 'inactive' : 'active',
           valid_until: gymForm.plan === 'free' ? null : valid_until,
         });
+
+        if (gymForm.branch_name?.trim()) {
+          await supabase.from('gym_branches').insert({ gym_id: gymId, name: gymForm.branch_name.trim() });
+        }
 
         if (gymForm.manager_email) {
           const { data: managerUser } = await supabase
@@ -617,6 +666,18 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const addBranchToGymFlux = async (gymRow: any) => {
+    const name = typeof window !== 'undefined' ? window.prompt(`Nombre de la sucursal para ${gymRow.name ?? 'el gym'}`) : null;
+    if (!name?.trim() || !gymRow?.id) return;
+    const { error } = await supabase.from('gym_branches').insert({ gym_id: gymRow.id, name: name.trim() });
+    if (error) {
+      showToast(error.message, 'error');
+      return;
+    }
+    showToast('Sucursal creada', 'success');
+    fetchAll();
   };
 
 
@@ -1109,6 +1170,12 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                             Editar
                           </button>
                           <button
+                            onClick={() => addBranchToGymFlux(gym)}
+                            className="flex-1 min-w-[45%] py-2 border border-[#0EA5E9] text-[#0EA5E9] text-xs font-bold rounded-xl active:scale-[0.98] transition-transform"
+                          >
+                            + Sucursal
+                          </button>
+                          <button
                             onClick={() => toggleGymActive(gym)}
                             className={`flex-1 min-w-[45%] py-2 text-xs font-bold rounded-xl active:scale-[0.98] transition-transform ${
                               gym.is_active
@@ -1269,7 +1336,68 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             })()}
           </div>
         ) : resolvedTab === 'solicitudes' ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-[#111]">Gyms pendientes de aprobación</h2>
+
+              {gyms.filter((g: any) => g.approval_status === 'pending').length === 0 ? (
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-[#666]">
+                  No hay gyms pendientes de aprobación
+                </div>
+              ) : (
+                gyms
+                  .filter((g: any) => g.approval_status === 'pending')
+                  .map((gym: any) => (
+                    <div key={gym.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h3 className="font-bold text-[#111]">{gym.name}</h3>
+                          <p className="text-xs text-[#666]">
+                            {gym.address}
+                            {gym.comuna ? `, ${gym.comuna}` : ''}
+                          </p>
+                        </div>
+                        <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded">PENDIENTE</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                        <div>
+                          <span className="text-[#666]">Teléfono:</span>
+                          <span className="ml-1 text-[#111]">{gym.phone || 'No especificado'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[#666]">Website:</span>
+                          <span className="ml-1 text-[#111]">{gym.website || 'No especificado'}</span>
+                        </div>
+                      </div>
+
+                      {gym.description ? (
+                        <p className="text-xs text-[#666] mb-3 p-2 bg-[#F5F5F5] rounded">{gym.description}</p>
+                      ) : null}
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => approveExistingGym(gym.id)}
+                          className="flex-1 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700"
+                        >
+                          ✓ Aprobar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => rejectExistingGym(gym.id)}
+                          className="flex-1 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700"
+                        >
+                          ✗ Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+
+            <div className="space-y-4 border-t border-[#E5E5E5] pt-6">
+              <h2 className="text-lg font-bold text-[#111]">Solicitudes de administrador gym</h2>
             {/* Filter chips */}
             <div className="flex gap-2 overflow-x-auto pb-1">
               {[
@@ -1344,6 +1472,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                 </div>
               ));
             })()}
+            </div>
           </div>
 
         ) : resolvedTab === 'socios' ? (
@@ -1708,27 +1837,32 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
               <div className="space-y-3">
                 <p className="text-xs font-bold text-[#666] uppercase tracking-wider">Gyms pendientes ({pendingGyms.length})</p>
                 {pendingGyms.map((gym: any) => (
-                  <div key={gym.id} className="bg-white rounded-xl border-2 border-amber-400 p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
+                  <div key={gym.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                    <div className="flex items-center justify-between mb-3">
                       <div>
-                        <p className="font-bold text-[#111]">{gym.name}</p>
-                        <p className="text-xs text-[#666]">{gym.comuna}</p>
-                        {gym.address && <p className="text-xs text-[#999] mt-0.5">{gym.address}</p>}
+                        <h3 className="font-bold text-[#111]">{gym.name}</h3>
+                        <p className="text-xs text-[#666]">
+                          {gym.address}
+                          {gym.comuna ? `, ${gym.comuna}` : ''}
+                        </p>
                       </div>
-                      <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Pendiente</span>
+                      <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded">PENDIENTE</span>
                     </div>
-                    <div className="flex gap-2">
+
+                    <div className="flex gap-2 mt-3">
                       <button
-                        onClick={async () => { await supabase.from('gyms').update({ approval_status: 'approved', is_active: true }).eq('id', gym.id); fetchAll(); }}
-                        className="flex-1 py-2 bg-[#16A34A] text-white text-sm font-bold rounded-xl flex items-center justify-center gap-1"
+                        type="button"
+                        onClick={() => approveExistingGym(gym.id)}
+                        className="flex-1 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700"
                       >
-                        <CheckCircle size={14} /> Aprobar
+                        ✓ Aprobar
                       </button>
                       <button
-                        onClick={async () => { await supabase.from('gyms').update({ approval_status: 'rejected', is_active: false }).eq('id', gym.id); fetchAll(); }}
-                        className="flex-1 py-2 border-2 border-[#CC0000] text-[#CC0000] text-sm font-bold rounded-xl flex items-center justify-center gap-1"
+                        type="button"
+                        onClick={() => rejectExistingGym(gym.id)}
+                        className="flex-1 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700"
                       >
-                        <XCircle size={14} /> Rechazar
+                        ✗ Rechazar
                       </button>
                     </div>
                   </div>
@@ -1970,7 +2104,40 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
                 <p className="text-2xl font-bold text-[#111]">{redemptions.filter((r: any) => r.commerce_id).length}</p>
                 <p className="text-xs text-[#666] mt-0.5">Canjes en Comercios</p>
               </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <p className="text-2xl font-bold text-[#111]">{couponUsage.length}</p>
+                <p className="text-xs text-[#666] mt-0.5">Cupones usados (gym)</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <p className="text-2xl font-bold text-[#111]">{new Set(couponUsage.map((row: any) => row.branch_id).filter(Boolean)).size}</p>
+                <p className="text-xs text-[#666] mt-0.5">Sucursales con uso</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <p className="text-2xl font-bold text-[#111]">{new Set(couponUsage.map((row: any) => row.type).filter(Boolean)).size}</p>
+                <p className="text-xs text-[#666] mt-0.5">Tipos de descuento</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
+                <p className="text-2xl font-bold text-[#111]">{formatCLP(couponUsage.reduce((acc: number, row: any) => acc + Number(row.amount || 0), 0))}</p>
+                <p className="text-xs text-[#666] mt-0.5">Monto total descuentos</p>
+              </div>
             </div>
+            {couponUsage.length > 0 && (
+              <div className="bg-white rounded-xl border border-[#E5E5E5] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#F5F5F5]">
+                  <p className="font-bold text-sm text-[#111]">Uso de cupones por gym/sucursal/tipo</p>
+                </div>
+                <div className="divide-y divide-[#F5F5F5]">
+                  {couponUsage.slice(0, 20).map((row: any) => (
+                    <div key={row.id} className="px-4 py-2.5 grid grid-cols-4 gap-2 text-xs text-[#666]">
+                      <span className="font-medium text-[#111]">{row.gym_id?.slice(0, 8) ?? 'gym'}</span>
+                      <span>{row.branch_id ? row.branch_id.slice(0, 8) : 'principal'}</span>
+                      <span>{row.type || 'tipo'}</span>
+                      <span className="text-right">{formatCLP(Number(row.amount || 0))}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {redemptions.length > 0 && (
               <div className="bg-white rounded-xl border border-[#E5E5E5] overflow-hidden">
                 <div className="px-4 py-3 border-b border-[#F5F5F5]">

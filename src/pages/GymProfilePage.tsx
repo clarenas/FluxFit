@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, MapPin, Phone, Globe, Share2 } from 'lucide-react';
+import { ArrowLeft, Heart, MapPin, Phone, Globe, Share2, Download, QrCode } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { OccupancyGauge } from '../components/OccupancyGauge';
@@ -27,6 +27,8 @@ export function GymProfilePage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<GymPlan | null>(null);
   const [selectedService, setSelectedService] = useState<GymService | null>(null);
+  const [selectedDiscount, setSelectedDiscount] = useState<GymDiscount | null>(null);
+  const [couponCode, setCouponCode] = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [todayLogs, setTodayLogs] = useState<OccupancyLog[]>([]);
   const { toast, showToast } = useToast();
@@ -87,6 +89,38 @@ export function GymProfilePage() {
       await navigator.clipboard.writeText(url);
       showToast('Link copiado al portapapeles', 'info');
     }
+  };
+
+  const handleDownloadCoupon = async (discount: GymDiscount) => {
+    const code = discount.coupon_code || `GF-${discount.id.slice(0, 8).toUpperCase()}`;
+    const couponText = `Fluxfit Cupón\nGym: ${gym?.name}\nDescuento: ${discount.title || discount.description}\nCódigo: ${code}`;
+    await navigator.clipboard.writeText(couponText);
+    showToast('Cupón copiado. Puedes pegarlo y guardarlo.', 'success');
+  };
+
+  const handleShowQr = async (discount: GymDiscount) => {
+    if (!user?.id || !gym?.id) {
+      showToast('Debes iniciar sesión para generar QR.', 'error');
+      return;
+    }
+    const code = discount.coupon_code || `GF-${Date.now().toString(36).toUpperCase()}`;
+    const qr = discount.qr_payload || `qr://${gym.id}/${code}/${user.id}`;
+    setCouponCode(qr);
+    setSelectedDiscount(discount);
+  };
+
+  const handleRegisterUsage = async () => {
+    if (!selectedDiscount || !gym?.id || !user?.id) return;
+    const amount = Number(selectedDiscount.discount_value ?? selectedDiscount.discount_percentage ?? 0);
+    await supabase.from('coupon_usage').insert({
+      gym_id: gym.id,
+      branch_id: selectedBranch?.id ?? null,
+      discount_id: selectedDiscount.id,
+      user_id: user.id,
+      type: selectedDiscount.type || 'plan_gym',
+      amount,
+    } as any);
+    showToast('Cupón listo para usar en sucursal', 'success');
   };
 
   if (fetchError) return (
@@ -270,9 +304,19 @@ export function GymProfilePage() {
             <h3 className="font-bold text-[#111111] mb-3">Descuentos en este gym</h3>
             <div className="bg-white rounded-xl border border-[#E5E5E5] divide-y divide-[#E5E5E5]">
               {discounts.map(d => (
-                <div key={d.id} className="p-4 flex items-center justify-between">
-                  <div><p className="text-sm text-[#111111]">{d.description}</p><p className="text-xs text-[#999] mt-0.5">Regular: {d.regular_value}</p></div>
-                  {!isPremium ? <span className="text-sm text-[#999]">✦ {d.premium_value} 🔒</span> : <span className="text-sm text-[#16A34A] font-bold">✦ {d.premium_value}</span>}
+                <div key={d.id} className="p-4 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm text-[#111111]">{d.title || d.description}</p>
+                    <p className="text-xs text-[#999] mt-0.5">{d.description}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleDownloadCoupon(d)} className="px-2 py-1 rounded-lg border border-[#E5E5E5] text-xs text-[#666] flex items-center gap-1">
+                      <Download size={12} /> Cupón
+                    </button>
+                    <button onClick={() => handleShowQr(d)} className="px-2 py-1 rounded-lg bg-[#CC0000] text-white text-xs flex items-center gap-1">
+                      <QrCode size={12} /> QR
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -290,6 +334,18 @@ export function GymProfilePage() {
 
       <BottomSheet open={!!selectedService} onClose={() => setSelectedService(null)} title={selectedService?.name}>
         {selectedService && <div className="space-y-3"><p className="text-sm text-[#666666]">{selectedService.description}</p><p className="text-sm text-[#666666]">Para reservar, contacta al gym: <a href={`tel:${gym.phone}`} className="text-[#CC0000] underline">{gym.phone}</a>{gym.website && <> o visita <a href={gym.website} target="_blank" rel="noopener noreferrer" className="text-[#CC0000] underline">el sitio web</a></>}</p></div>}
+      </BottomSheet>
+
+      <BottomSheet open={!!selectedDiscount} onClose={() => setSelectedDiscount(null)} title={selectedDiscount?.title || 'Cupón QR'}>
+        {selectedDiscount && (
+          <div className="space-y-3">
+            <p className="text-sm text-[#666]">Presenta este código QR en sucursal para canjear tu descuento.</p>
+            <div className="bg-[#F5F5F5] rounded-xl p-3 font-mono text-xs break-all">{couponCode}</div>
+            <button onClick={handleRegisterUsage} className="w-full py-2.5 bg-[#CC0000] text-white font-bold rounded-xl text-sm">
+              Usar en sucursal
+            </button>
+          </div>
+        )}
       </BottomSheet>
     </div>
   );

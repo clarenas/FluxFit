@@ -170,7 +170,7 @@ export function AuthPage() {
   // Redirect to role-appropriate home immediately after login — no flash
   const roleHome = (role: string | undefined) => {
     if (role === 'fluxfit_admin') return '/admin/fluxfit';
-    if (role === 'gym_admin') return '/admin/gym';
+    if (role === 'gym_admin') return '/gym-admin';
     if (role === 'commerce_admin') return '/admin/commerce';
     return '/home';
   };
@@ -613,7 +613,7 @@ export function AuthPage() {
                 phone: gymPhone,
               });
               await refreshProfile();
-              navigate('/admin/gym', { replace: true });
+              navigate('/gym-admin', { replace: true });
             } catch (err: any) {
               setError(err.message || 'Error al enviar solicitud');
             } finally { setSubmitting(false); }
