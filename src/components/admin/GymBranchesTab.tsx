@@ -5,13 +5,34 @@ import { Plus, Trash2, MapPin } from 'lucide-react';
 
 const inp = 'w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:outline-none focus:border-[#CC0000]';
 
-interface Props { gymId: string; branches: GymBranch[]; onRefresh: () => void; }
+interface Props {
+  gymId: string;
+  gymName: string;
+  branches: GymBranch[];
+  onRefresh: () => void;
+  maxBranches: number;
+  canManage: boolean;
+  plan?: 'free' | 'light' | 'pro';
+  onRequestExtraBranch?: () => void;
+}
 
-export function GymBranchesTab({ gymId, branches, onRefresh }: Props) {
+const planLimits = {
+  free: 1,
+  light: 3,
+  pro: 6,
+};
+
+export function GymBranchesTab({ gymId, gymName, branches, onRefresh, maxBranches, canManage, plan, onRequestExtraBranch }: Props) {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ name: '', address: '', comuna: '', phone: '' });
 
   const add = async () => {
+    if (!canManage) return;
+    const limit = plan ? planLimits[plan] : maxBranches;
+    if (branches.length >= limit) {
+      alert('Límite de sucursales alcanzado');
+      return;
+    }
     if (!form.name || !form.address) return;
     await supabase.from('gym_branches').insert({ gym_id: gymId, ...form });
     setForm({ name: '', address: '', comuna: '', phone: '' });
@@ -20,6 +41,7 @@ export function GymBranchesTab({ gymId, branches, onRefresh }: Props) {
   };
 
   const del = async (id: string) => {
+    if (!canManage) return;
     if (!confirm('¿Eliminar sucursal?')) return;
     await supabase.from('gym_branches').delete().eq('id', id);
     onRefresh();
@@ -27,6 +49,11 @@ export function GymBranchesTab({ gymId, branches, onRefresh }: Props) {
 
   return (
     <div className="space-y-3">
+      <div className="bg-white rounded-xl border border-[#E5E5E5] p-3">
+        <p className="text-xs text-[#666]">
+          {gymName} · Sucursales: <span className="font-bold text-[#111]">{branches.length}</span> / <span className="font-bold text-[#111]">{maxBranches}</span>
+        </p>
+      </div>
       {branches.length === 0 && !show && <p className="text-center py-8 text-[#999] text-sm">No hay sucursales registradas</p>}
       {branches.map(b => (
         <div key={b.id} className="bg-white rounded-xl border border-[#E5E5E5] p-3">
@@ -42,11 +69,13 @@ export function GymBranchesTab({ gymId, branches, onRefresh }: Props) {
                 {b.phone && <p className="text-xs text-[#999]">{b.phone}</p>}
               </div>
             </div>
-            <button onClick={() => del(b.id)} className="p-1.5"><Trash2 size={15} className="text-[#CC0000]" /></button>
+            {canManage && (
+              <button onClick={() => del(b.id)} className="p-1.5"><Trash2 size={15} className="text-[#CC0000]" /></button>
+            )}
           </div>
         </div>
       ))}
-      {show ? (
+      {show && canManage ? (
         <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 space-y-2">
           <input placeholder="Nombre *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className={inp} />
           <input placeholder="Dirección *" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} className={inp} />
@@ -57,10 +86,30 @@ export function GymBranchesTab({ gymId, branches, onRefresh }: Props) {
             <button onClick={() => setShow(false)} className="flex-1 py-2 border border-[#E5E5E5] rounded-lg text-sm">Cancelar</button>
           </div>
         </div>
+      ) : canManage ? (
+        branches.length < maxBranches ? (
+          <button onClick={() => setShow(true)} className="w-full py-2 border-2 border-dashed border-[#E5E5E5] rounded-xl text-[#666] text-sm flex items-center justify-center gap-1">
+            <Plus size={16} /> Agregar sucursal
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <div className="w-full py-2 border border-amber-300 bg-amber-50 rounded-xl text-amber-700 text-sm text-center font-medium">
+              Has alcanzado el máximo de sucursales de tu plan
+            </div>
+            {onRequestExtraBranch && (
+              <button
+                onClick={onRequestExtraBranch}
+                className="w-full py-2 border-2 border-[#CC0000] text-[#CC0000] rounded-xl text-sm font-bold"
+              >
+                Solicitar sucursal adicional ($22.000)
+              </button>
+            )}
+          </div>
+        )
       ) : (
-        <button onClick={() => setShow(true)} className="w-full py-2 border-2 border-dashed border-[#E5E5E5] rounded-xl text-[#666] text-sm flex items-center justify-center gap-1">
-          <Plus size={16} /> Agregar sucursal
-        </button>
+        <div className="w-full py-2 border border-[#E5E5E5] bg-[#F5F5F5] rounded-xl text-[#666] text-sm text-center">
+          Tu plan actual permite solo lectura de sucursales.
+        </div>
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 type AccountType = 'usuario' | 'gym' | 'comercio';
 
 const COMUNAS = ['Ñuñoa', 'Las Condes', 'Vitacura', 'Providencia', 'La Reina', 'Peñalolén'];
+const TEST_MODE_SKIP_VERIFICATION = true;
 
 const waitForProfile = async (userId: string) => {
   for (let i = 0; i < 10; i++) {
@@ -19,10 +20,121 @@ const waitForProfile = async (userId: string) => {
   return null;
 };
 
+const ensureGymAdminAccess = async (params: {
+  userId: string;
+  email: string;
+  fallbackName?: string;
+  gymName?: string;
+  comunas?: string[];
+  phone?: string;
+}) => {
+  const { userId, email, fallbackName, gymName, comunas, phone } = params;
+  const { data: existingAdmin } = await supabase
+    .from('gym_admins')
+    .select('gym_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existingAdmin?.gym_id) return true;
+
+  const { data: latestRequest } = await supabase
+    .from('gym_admin_requests')
+    .select('gym_name, comunas, phone')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const resolvedGymName =
+    gymName?.trim() ||
+    latestRequest?.gym_name?.trim() ||
+    `${fallbackName?.trim() || email.split('@')[0]} Gym`;
+
+  const requestComunas = Array.isArray(latestRequest?.comunas) ? latestRequest.comunas : [];
+  const resolvedComuna = comunas?.[0] || requestComunas[0] || 'Por definir';
+  const resolvedPhone = phone || latestRequest?.phone || '';
+
+  const { data: createdGym, error: gymError } = await supabase
+    .from('gyms')
+    .insert({
+      name: resolvedGymName,
+      address: 'Por definir',
+      comuna: resolvedComuna,
+      phone: resolvedPhone,
+      website: '',
+      description: 'Gym en configuracion inicial',
+      is_active: true,
+      approval_status: 'pending',
+    })
+    .select('id')
+    .single();
+
+  if (gymError || !createdGym?.id) throw gymError || new Error('No se pudo crear gym inicial');
+
+  await supabase.from('gym_subscriptions').upsert(
+    {
+      gym_id: createdGym.id,
+      plan: 'free',
+      plan_price: 0,
+      status: 'active',
+      valid_until: null,
+    },
+    { onConflict: 'gym_id' }
+  );
+
+  await supabase.from('gym_admins').insert({ user_id: userId, gym_id: createdGym.id });
+  await supabase.from('users').update({ role: 'gym_admin' }).eq('id', userId);
+  return true;
+};
+
+const ensureCommerceAdminAccess = async (params: {
+  userId: string;
+  email: string;
+  fallbackName?: string;
+}) => {
+  const { userId, email, fallbackName } = params;
+  const { data: existingAdmin } = await supabase
+    .from('commerce_admins')
+    .select('commerce_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existingAdmin?.commerce_id) return true;
+
+  const { data: createdCommerce, error: commerceError } = await supabase
+    .from('commerces')
+    .insert({
+      name: `${fallbackName?.trim() || email.split('@')[0]} Comercio`,
+      category: 'otro',
+      phone: '',
+      description: 'Comercio en configuracion inicial',
+      is_active: true,
+      approval_status: 'pending',
+    })
+    .select('id')
+    .single();
+
+  if (commerceError || !createdCommerce?.id) throw commerceError || new Error('No se pudo crear comercio inicial');
+
+  await supabase.from('commerce_subscriptions').upsert(
+    {
+      commerce_id: createdCommerce.id,
+      plan: 'free',
+      status: 'active',
+      valid_until: null,
+    },
+    { onConflict: 'commerce_id' }
+  );
+
+  await supabase.from('commerce_admins').insert({ user_id: userId, commerce_id: createdCommerce.id });
+  await supabase.from('users').update({ role: 'commerce_admin' }).eq('id', userId);
+  return true;
+};
+
 export function AuthPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { signUp, signIn, user, loading } = useAuth();
+  const { signUp, signIn, user, loading, refreshProfile } = useAuth();
   const isLogin = params.get('mode') !== 'register';
   const isReset = params.get('mode') === 'reset';
 
@@ -38,6 +150,8 @@ export function AuthPage() {
   const [isRecovery, setIsRecovery] = useState(false);
   const [recoverySuccess, setRecoverySuccess] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [loginType, setLoginType] = useState<AccountType>('usuario');
+  const [resolvingLogin, setResolvingLogin] = useState(false);
 
   // Account type selection
   const [accountType, setAccountType] = useState<AccountType | null>(null);
@@ -46,7 +160,7 @@ export function AuthPage() {
   const [gymName, setGymName] = useState('');
   const [gymComunas, setGymComunas] = useState<string[]>([]);
   const [gymPhone, setGymPhone] = useState('');
-  const [gymRequestSent, setGymRequestSent] = useState(false);
+  const [gymRequestSent] = useState(false);
 
   // Commerce-specific state
   const [commerceName, setCommerceName] = useState('');
@@ -62,10 +176,10 @@ export function AuthPage() {
   };
 
   useEffect(() => {
-    if (!loading && user && !isReset) {
+    if (!loading && user && !isReset && !resolvingLogin) {
       navigate(roleHome(user.role), { replace: true });
     }
-  }, [user, loading, navigate, isReset]);
+  }, [user, loading, navigate, isReset, resolvingLogin]);
 
   useEffect(() => {
     if (params.get('mode') !== 'register' && params.get('mode') !== 'reset') {
@@ -248,14 +362,83 @@ export function AuthPage() {
         <h1 className="text-xl font-bold text-[#111111] mt-6 mb-6">Inicia sesión</h1>
         <form
           onSubmit={async (e) => {
-            e.preventDefault(); setError(''); setSubmitting(true);
-            try { await signIn(email, password); }
+            e.preventDefault(); setError(''); setSubmitting(true); setResolvingLogin(true);
+            try {
+              await signIn(email, password);
+              await refreshProfile();
+
+              const { data: authData } = await supabase.auth.getUser();
+              const authUser = authData.user;
+              if (!authUser) throw new Error('No se pudo validar tu sesión');
+
+              const { data: profile } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', authUser.id)
+                .maybeSingle();
+
+              let resolvedRole = profile?.role ?? 'user';
+              if (['user', 'gym_pending', 'commerce_pending'].includes(resolvedRole)) {
+                const [{ data: gymAdmin }, { data: commerceAdmin }] = await Promise.all([
+                  supabase.from('gym_admins').select('id').eq('user_id', authUser.id).maybeSingle(),
+                  supabase.from('commerce_admins').select('id').eq('user_id', authUser.id).maybeSingle(),
+                ]);
+                if (gymAdmin) resolvedRole = 'gym_admin';
+                else if (commerceAdmin) resolvedRole = 'commerce_admin';
+              }
+
+              if (TEST_MODE_SKIP_VERIFICATION && loginType === 'gym' && resolvedRole !== 'gym_admin') {
+                await ensureGymAdminAccess({
+                  userId: authUser.id,
+                  email: authUser.email ?? email,
+                  fallbackName: profile?.role ? undefined : fullName,
+                });
+                resolvedRole = 'gym_admin';
+              }
+
+              if (TEST_MODE_SKIP_VERIFICATION && loginType === 'comercio' && resolvedRole !== 'commerce_admin') {
+                await ensureCommerceAdminAccess({
+                  userId: authUser.id,
+                  email: authUser.email ?? email,
+                  fallbackName: profile?.role ? undefined : fullName,
+                });
+                resolvedRole = 'commerce_admin';
+              }
+
+              navigate(roleHome(resolvedRole), { replace: true });
+            }
             catch (err: any) {
               setError(err.message === 'Invalid login credentials' ? 'Credenciales inválidas' : err.message || 'Error al iniciar sesión');
-            } finally { setSubmitting(false); }
+            } finally { setSubmitting(false); setResolvingLogin(false); }
           }}
           className="w-full max-w-xs space-y-4"
         >
+          <div>
+            <label className={labelClass}>Ingresar como</label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setLoginType('usuario')}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${loginType === 'usuario' ? 'bg-[#CC0000] text-white border-[#CC0000]' : 'bg-white text-[#666666] border-[#E5E5E5]'}`}
+              >
+                Usuario
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginType('gym')}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${loginType === 'gym' ? 'bg-[#CC0000] text-white border-[#CC0000]' : 'bg-white text-[#666666] border-[#E5E5E5]'}`}
+              >
+                Gym
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginType('comercio')}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${loginType === 'comercio' ? 'bg-[#CC0000] text-white border-[#CC0000]' : 'bg-white text-[#666666] border-[#E5E5E5]'}`}
+              >
+                Comercio
+              </button>
+            </div>
+          </div>
           <div>
             <label className={labelClass}>Email</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} placeholder="tu@email.com" required />
@@ -416,13 +599,21 @@ export function AuthPage() {
               if (!userId) throw new Error('No se pudo crear la cuenta');
               const gymProfile = await waitForProfile(userId);
               if (gymProfile) {
-                await supabase.from('users').update({ full_name: fullName, role: 'gym_pending' }).eq('id', userId);
+                await supabase.from('users').update({ full_name: fullName, role: 'gym_admin' }).eq('id', userId);
               }
-              const { error: reqError } = await supabase.from('gym_admin_requests').insert({
+              await supabase.from('gym_admin_requests').insert({
                 user_id: userId, gym_name: gymName, comunas: gymComunas, phone: gymPhone, plan_interest: 'por_definir', status: 'pending',
               });
-              if (reqError) throw reqError;
-              setGymRequestSent(true);
+              await ensureGymAdminAccess({
+                userId,
+                email,
+                fallbackName: fullName,
+                gymName,
+                comunas: gymComunas,
+                phone: gymPhone,
+              });
+              await refreshProfile();
+              navigate('/admin/gym', { replace: true });
             } catch (err: any) {
               setError(err.message || 'Error al enviar solicitud');
             } finally { setSubmitting(false); }
@@ -469,7 +660,7 @@ export function AuthPage() {
             {submitting ? 'Enviando...' : 'Enviar solicitud'}
           </button>
           <p className="text-xs text-[#666] text-center mt-3">
-            Una vez validada tu solicitud podrás ver y contratar los planes disponibles desde tu panel de administración.
+            En modo prueba: acceso inmediato al panel Gym Free para configurar tu cuenta y luego elegir plan.
           </p>
         </form>
         <button type="button" onClick={() => setAccountType(null)} className="mt-4 text-sm text-[#666666]">
@@ -494,7 +685,7 @@ export function AuthPage() {
             if (!userId) throw new Error('No se pudo crear la cuenta');
             const commerceProfile = await waitForProfile(userId);
             if (commerceProfile) {
-              await supabase.from('users').update({ full_name: fullName }).eq('id', userId);
+              await supabase.from('users').update({ full_name: fullName, role: 'commerce_admin' }).eq('id', userId);
             }
             const { data: commerceData, error: commerceError } = await supabase
               .from('commerces')
@@ -506,7 +697,12 @@ export function AuthPage() {
               .from('commerce_admins')
               .insert({ user_id: userId, commerce_id: commerceData.id });
             if (adminError) throw adminError;
-            navigate('/home');
+            await supabase.from('commerce_subscriptions').upsert(
+              { commerce_id: commerceData.id, plan: 'free', status: 'active', valid_until: null },
+              { onConflict: 'commerce_id' }
+            );
+            await refreshProfile();
+            navigate('/admin/commerce', { replace: true });
           } catch (err: any) {
             setError(err.message || 'Error al registrar comercio');
           } finally { setSubmitting(false); }
