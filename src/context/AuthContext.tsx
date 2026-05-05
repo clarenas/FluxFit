@@ -29,6 +29,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('id', userId)
       .maybeSingle();
+    if (!data) return null;
+
+    // Fallback role resolution: some historical accounts may still have role='user'
+    // even when linked to gym_admins/commerce_admins.
+    if (data.role === 'user') {
+      const [{ data: gymAdmin }, { data: commerceAdmin }] = await Promise.all([
+        supabase.from('gym_admins').select('id').eq('user_id', userId).maybeSingle(),
+        supabase.from('commerce_admins').select('id').eq('user_id', userId).maybeSingle(),
+      ]);
+
+      if (gymAdmin) return { ...data, role: 'gym_admin' };
+      if (commerceAdmin) return { ...data, role: 'commerce_admin' };
+    }
+
     return data;
   };
 

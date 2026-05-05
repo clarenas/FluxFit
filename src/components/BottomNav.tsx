@@ -44,7 +44,21 @@ export function BottomNav() {
 
   // Role is already in context — no DB lookup needed
   const role = isGuest ? 'user' : (user?.role ?? 'user');
-  const tabs = ROLE_TABS[role] ?? ROLE_TABS.user;
+  const isPremium = user?.plan === 'premium';
+  const baseTabs = ROLE_TABS[role] ?? ROLE_TABS.user;
+  const tabs = role === 'user' && isPremium
+    ? [
+        ...baseTabs.slice(0, 3),
+        { path: '/discounts', label: 'Descuentos Fluxfit', Icon: Tag },
+        { path: '/compare', label: 'Comparar', Icon: BarChart2 },
+        ...baseTabs.slice(3),
+      ]
+    : baseTabs;
+  const sidebarSubtitle =
+    role === 'fluxfit_admin' ? 'Panel Admin' :
+    role === 'gym_admin' ? 'Panel Gym' :
+    role === 'commerce_admin' ? 'Panel Comercio' :
+    'Panel Usuario';
 
   const isActive = (path: string) => {
     // Exact match for root admin paths to avoid /admin/gym matching /admin/gym/branches
@@ -60,21 +74,29 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:fixed md:left-0 md:top-0 md:translate-x-0 md:bottom-auto md:w-[200px] md:h-screen md:max-w-none bg-white border-t border-[#E5E5E5] md:border-t-0 md:border-r md:border-[#E5E5E5] flex items-center justify-around z-40">
-      <div className="flex justify-around items-center h-16 px-2 w-full md:flex-col md:h-full md:justify-start md:items-stretch md:px-0 md:pt-8 md:gap-1">
+      <div className="flex justify-around items-center h-16 px-2 w-full md:flex-col md:h-full md:justify-start md:items-stretch md:px-0 md:gap-0">
+        <div className="hidden md:block px-4 pt-5 pb-4 border-b border-[#F0F0F0]">
+          <p style={{ color: '#CC0000', fontWeight: 500, fontSize: 18 }}>FLUXFIT</p>
+          <p style={{ fontSize: 12 }} className="text-[#999] mt-0.5">{sidebarSubtitle}</p>
+        </div>
+        <div className="hidden md:block py-2" />
         {tabs.map(({ path, label, Icon }) => {
           const active = isActive(path);
           return (
             <button
               key={path}
               onClick={() => navigate(path)}
-              className={`flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] md:flex-row md:justify-start md:px-5 md:py-3 md:gap-3 md:min-w-0 md:w-full ${active ? 'md:bg-[#CC0000]/5' : ''}`}
+              style={active ? { fontSize: 14, padding: '0.625rem 1rem' } : { fontSize: 14, padding: '0.625rem 1rem' }}
+              className={`flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] md:flex-row md:justify-start md:min-w-0 md:w-full md:text-left md:transition-colors ${
+                active ? 'md:bg-[#CC0000] md:text-white' : 'md:text-[#111] md:hover:bg-[#F5F5F5]'
+              }`}
             >
               <Icon
                 size={22}
-                className={active ? 'text-[#CC0000]' : 'text-[#666]'}
+                className={`${active ? 'text-[#CC0000]' : 'text-[#666]'} md:w-4 md:h-4 ${active ? 'md:text-white' : 'md:text-[#111]'}`}
                 strokeWidth={active ? 2.5 : 1.5}
               />
-              <span className={`text-[10px] font-medium md:text-sm ${active ? 'text-[#CC0000] font-bold' : 'text-[#666]'}`}>
+              <span className={`text-[10px] font-medium md:text-sm md:font-medium ${active ? 'text-[#CC0000] font-bold md:text-white' : 'text-[#666] md:text-[#111]'}`}>
                 {label}
               </span>
             </button>

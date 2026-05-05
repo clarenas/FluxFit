@@ -35,6 +35,9 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [requests, setRequests] = useState<any[]>([]);
   const [commerces, setCommerces] = useState<any[]>([]);
   const [redemptions, setRedemptions] = useState<any[]>([]);
+  const [sensors, setSensors] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [sensorHistory, setSensorHistory] = useState<any[]>([]);
   const [pendingGyms, setPendingGyms] = useState<any[]>([]);
   const [pendingCommerces, setPendingCommerces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +55,7 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [comercioFilter, setComercioFilter] = useState('todos');
   const [selectedComercioHistory, setSelectedComercioHistory] = useState<string | null>(null);
   const [showAddComercioModal, setShowAddComercioModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [editingComercio, setEditingComercio] = useState<any>(null);
   const [savingComercio, setSavingComercio] = useState(false);
   const [newComercio, setNewComercio] = useState({ name: '', category: 'nutricion', address: '', plan: 'basic', plan_price: 39900, products_count: 0, coupons_count: 0, canjes_total: 0, is_active: true });
@@ -63,18 +67,49 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
   const [gestionSubTab, setGestionSubTab] = useState('gyms');
   const [showGestionSubmenu, setShowGestionSubmenu] = useState(false);
+  const [sensorForm, setSensorForm] = useState({
+    gym_id: '',
+    branch_id: '',
+    kit_name: 'Acceso Principal',
+    location: '',
+    brand: '',
+    model: '',
+    entry_code: '',
+    exit_code: '',
+  });
+  const [replaceSensorModal, setReplaceSensorModal] = useState<{
+    kitId: string;
+    branchId: string;
+    sensorId: string;
+    position: 'entry' | 'exit';
+    currentSerial: string;
+    brand: string;
+    model: string;
+  } | null>(null);
+  const [replaceSensorForm, setReplaceSensorForm] = useState({
+    serial_number: '',
+    brand: '',
+    model: '',
+    reason: 'replaced',
+  });
 
   const { toast, showToast } = useToast();
 
   const fetchAll = async () => {
     setLoading(true);
-    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes] = await Promise.all([
+    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes, sensorsRes, branchesRes, sensorHistoryRes] = await Promise.all([
       supabase.from('gyms').select('*, gym_subscriptions(plan,plan_price,status,valid_until), gym_branches(id), gym_admins(id)').order('name'),
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('contact_messages').select('*').order('created_at', { ascending: false }),
       supabase.from('gym_admin_requests').select('*, users(email,full_name,role)').order('created_at', { ascending: false }),
       supabase.from('commerces').select('*, commerce_subscriptions(plan,status,valid_until)').order('name'),
       supabase.from('coupon_redemptions').select('*').order('redeemed_at', { ascending: false }),
+      supabase
+        .from('sensor_kits')
+        .select('*, gym_branches(name, gym_id, gyms(name)), sensors(id, position, serial_number, status, last_heartbeat, secret_key, brand, model, installation_date)')
+        .order('created_at', { ascending: false }),
+      supabase.from('gym_branches').select('id, gym_id, name').order('name'),
+      supabase.from('sensor_history').select('*').order('retired_at', { ascending: false }).limit(200),
     ]);
 
     const mappedGyms = (gymsRes.data ?? []).map((g: any) => {
@@ -96,6 +131,9 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     setRequests(requestsRes.data ?? []);
     setCommerces(commercesRes.data ?? []);
     setRedemptions(redemptionsRes.data ?? []);
+    setSensors(sensorsRes.data ?? []);
+    setBranches(branchesRes.data ?? []);
+    setSensorHistory(sensorHistoryRes.data ?? []);
     setPendingGyms(mappedGyms.filter((g: any) => g.approval_status === 'pending'));
     setPendingCommerces((commercesRes.data ?? []).filter((c: any) => c.approval_status === 'pending'));
     setLoading(false);
@@ -266,6 +304,169 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
     await supabase.from('gyms').update({ is_active: !gym.is_active }).eq('id', gym.id);
     showToast(`Gym ${gym.is_active ? 'dado de baja' : 'dado de alta'} correctamente`, 'success');
     fetchAll();
+  };
+
+  const registerSensor = async () => {
+    if (!sensorForm.gym_id || !sensorForm.branch_id || !sensorForm.entry_code || !sensorForm.exit_code) return;
+
+    const { data: existingCodes } = await supabase
+      .from('sensors')
+      .select('serial_number')
+      .in('serial_number', [sensorForm.entry_code.trim(), sensorForm.exit_code.trim()])
+      .neq('status', 'retired');
+
+    if (existingCodes && existingCodes.length > 0) {
+      showToast(`Código ya registrado: ${existingCodes.map((s: any) => s.serial_number).join(', ')}`, 'error');
+      return;
+    }
+
+    const { data: newKit, error } = await supabase.from('sensor_kits').insert({
+      branch_id: sensorForm.branch_id,
+      name: sensorForm.kit_name.trim() || 'Acceso Principal',
+      status: 'operativo',
+      activation_date: new Date().toISOString().split('T')[0],
+      observations: sensorForm.location || null,
+    } as any).select('id').single();
+
+    if (error) {
+      showToast('Error al registrar sensor', 'error');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const { error: sensorsErr } = await supabase.from('sensors').insert([
+      {
+        kit_id: newKit.id,
+        branch_id: sensorForm.branch_id,
+        position: 'entry',
+        label: `${sensorForm.kit_name.trim() || 'Acceso Principal'} — Entrada`,
+        brand: sensorForm.brand.trim(),
+        model: sensorForm.model.trim(),
+        serial_number: sensorForm.entry_code.trim(),
+        installation_date: now,
+        status: 'active',
+      },
+      {
+        kit_id: newKit.id,
+        branch_id: sensorForm.branch_id,
+        position: 'exit',
+        label: `${sensorForm.kit_name.trim() || 'Acceso Principal'} — Salida`,
+        brand: sensorForm.brand.trim(),
+        model: sensorForm.model.trim(),
+        serial_number: sensorForm.exit_code.trim(),
+        installation_date: now,
+        status: 'active',
+      },
+    ]);
+
+    if (sensorsErr) {
+      showToast('Kit creado, pero falló el alta de sensores', 'error');
+      await supabase.from('sensor_kits').delete().eq('id', newKit.id);
+      return;
+    }
+
+    setShowRegisterModal(false);
+    setSensorForm({
+      gym_id: '',
+      branch_id: '',
+      kit_name: 'Acceso Principal',
+      location: '',
+      brand: '',
+      model: '',
+      entry_code: '',
+      exit_code: '',
+    });
+    fetchAll();
+    showToast('Sensor registrado exitosamente', 'success');
+  };
+
+  const toggleSensorStatus = async (sensor: any) => {
+    const nextStatus = sensor.status === 'baja' ? 'operativo' : 'baja';
+    await supabase.from('sensor_kits').update({ status: nextStatus }).eq('id', sensor.id);
+    await supabase
+      .from('sensors')
+      .update({ status: nextStatus === 'baja' ? 'maintenance' : 'active' })
+      .eq('kit_id', sensor.id);
+    fetchAll();
+  };
+
+  const reassignKitBranch = async (sensor: any, branchId: string) => {
+    if (!branchId) return;
+    await supabase.from('sensor_kits').update({ branch_id: branchId }).eq('id', sensor.id);
+    await supabase.from('sensors').update({ branch_id: branchId }).eq('kit_id', sensor.id);
+    fetchAll();
+    showToast('Kit reasignado correctamente', 'success');
+  };
+
+  const openReplaceSensorModal = (kit: any, sensor: any) => {
+    setReplaceSensorModal({
+      kitId: kit.id,
+      branchId: kit.branch_id,
+      sensorId: sensor.id,
+      position: sensor.position,
+      currentSerial: sensor.serial_number || '',
+      brand: sensor.brand || '',
+      model: sensor.model || '',
+    });
+    setReplaceSensorForm({
+      serial_number: '',
+      brand: sensor.brand || '',
+      model: sensor.model || '',
+      reason: 'replaced',
+    });
+  };
+
+  const replaceSensorHardware = async () => {
+    if (!replaceSensorModal || !replaceSensorForm.serial_number.trim()) return;
+
+    const { data: existing } = await supabase
+      .from('sensors')
+      .select('id')
+      .eq('serial_number', replaceSensorForm.serial_number.trim())
+      .neq('id', replaceSensorModal.sensorId)
+      .neq('status', 'retired')
+      .maybeSingle();
+
+    if (existing) {
+      showToast('Ese código ya está asignado a otro sensor activo', 'error');
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    const { error: historyErr } = await supabase.from('sensor_history').insert({
+      kit_id: replaceSensorModal.kitId,
+      position: replaceSensorModal.position,
+      brand: replaceSensorModal.brand || '',
+      model: replaceSensorModal.model || '',
+      serial_number: replaceSensorModal.currentSerial || '',
+      installed_at: now,
+      retired_at: now,
+      retired_reason: replaceSensorForm.reason || 'replaced',
+    } as any);
+
+    if (historyErr) {
+      showToast('No se pudo guardar historial del sensor saliente', 'error');
+      return;
+    }
+
+    const { error: updateErr } = await supabase.from('sensors').update({
+      serial_number: replaceSensorForm.serial_number.trim(),
+      brand: replaceSensorForm.brand.trim(),
+      model: replaceSensorForm.model.trim(),
+      installation_date: now,
+      status: 'active',
+    }).eq('id', replaceSensorModal.sensorId);
+
+    if (updateErr) {
+      showToast('No se pudo actualizar el sensor', 'error');
+      return;
+    }
+
+    setReplaceSensorModal(null);
+    setReplaceSensorForm({ serial_number: '', brand: '', model: '', reason: 'replaced' });
+    fetchAll();
+    showToast('Sensor reemplazado correctamente', 'success');
   };
 
   const deleteGym = async (gym: any) => {
@@ -1567,6 +1768,184 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
             )}
           </div>
 
+        ) : resolvedTab === 'sensores' ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#111]">Gestión de Sensores</h2>
+              <button
+                onClick={() => setShowRegisterModal(true)}
+                className="px-4 py-2 bg-[#CC0000] text-white text-sm font-bold rounded-lg hover:bg-[#990000] transition-colors flex items-center gap-2"
+              >
+                <Plus size={18} />
+                Registrar Kit
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                <p className="text-2xl font-bold text-[#111]">{sensors.length}</p>
+                <p className="text-xs text-[#666] mt-0.5">Kits registrados</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                <p className="text-2xl font-bold text-green-600">{sensors.filter((s: any) => (s.sensors ?? []).some((x: any) => x.last_heartbeat && (Date.now() - new Date(x.last_heartbeat).getTime()) < 5 * 60 * 1000)).length}</p>
+                <p className="text-xs text-[#666] mt-0.5">Online</p>
+              </div>
+              <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                <p className="text-2xl font-bold text-[#CC0000]">{sensors.filter((s: any) => !(s.sensors ?? []).some((x: any) => x.last_heartbeat && (Date.now() - new Date(x.last_heartbeat).getTime()) < 5 * 60 * 1000)).length}</p>
+                <p className="text-xs text-[#666] mt-0.5">Offline</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-[#E5E5E5] p-3">
+              <p className="text-[11px] font-bold text-[#666] mb-1.5">Leyenda de estado</p>
+              <div className="flex flex-wrap items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                  <span className="text-[#111]">Operativo</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                  <span className="text-[#111]">Inactivo</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                  <span className="text-[#111]">Alerta de falla</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {sensors.map((sensor: any) => (
+                (() => {
+                  const lastPing = (sensor.sensors ?? [])
+                    .map((x: any) => x.last_heartbeat)
+                    .filter(Boolean)
+                    .sort()
+                    .reverse()[0];
+                  const sensorKey = (sensor.sensors ?? [])[0]?.secret_key ?? sensor.name ?? '—';
+                  const active = sensor.status !== 'baja';
+                  const entrySensor = (sensor.sensors ?? []).find((x: any) => x.position === 'entry');
+                  const exitSensor = (sensor.sensors ?? []).find((x: any) => x.position === 'exit');
+                  const kitHistory = sensorHistory.filter((h: any) => h.kit_id === sensor.id).slice(0, 3);
+                  const hasFailure = (sensor.sensors ?? []).some((x: any) => x.status === 'maintenance' || x.status === 'offline');
+                  const alertState = hasFailure ? 'falla' : (active ? 'operativo' : 'inactivo');
+                  const alertClass =
+                    alertState === 'operativo' ? 'bg-green-500' :
+                    alertState === 'inactivo' ? 'bg-orange-500' :
+                    'bg-red-500';
+                  const alertLabel =
+                    alertState === 'operativo' ? 'Operativo' :
+                    alertState === 'inactivo' ? 'Inactivo' :
+                    'Alerta de falla';
+                  return (
+                <div key={sensor.id} className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${alertClass}`} />
+                        <h3 className="font-bold text-[#111]">{sensor.gym_branches?.gyms?.name || 'Gym desconocido'}</h3>
+                        <span className="text-xs text-[#666]">• {sensor.gym_branches?.name || 'Sin sucursal'}</span>
+                        <span className="text-xs font-bold text-[#666]">• {alertLabel}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-[#666]">Código kit:</span>
+                          <span className="ml-1 font-mono text-[#111]">{sensorKey}</span>
+                        </div>
+                        <div>
+                          <span className="text-[#666]">Ubicación:</span>
+                          <span className="ml-1 text-[#111]">{sensor.observations || 'No especificada'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[#666]">Estado:</span>
+                          <span className={`ml-1 font-bold ${
+                            alertState === 'operativo' ? 'text-green-600' :
+                            alertState === 'inactivo' ? 'text-orange-600' :
+                            'text-red-600'
+                          }`}>
+                            {alertLabel}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[#666]">Última señal:</span>
+                          <span className="ml-1 text-[#111]">
+                            {lastPing ? new Date(lastPing).toLocaleString('es-CL') : 'Nunca'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {[{ label: 'Entrada', data: entrySensor }, { label: 'Salida', data: exitSensor }].map((item) => (
+                          <div key={item.label} className="border border-[#EDEDED] rounded-lg p-2">
+                            <p className="text-[11px] font-bold text-[#111]">{item.label}</p>
+                            <p className="text-[11px] text-[#666]">ID: <span className="font-mono text-[#111]">{item.data?.id ?? '—'}</span></p>
+                            <p className="text-[11px] text-[#666]">Código: <span className="font-mono text-[#111]">{item.data?.serial_number ?? '—'}</span></p>
+                            <p className="text-[11px] text-[#666]">
+                              Activo:{' '}
+                              <span className={`font-bold ${item.data?.status === 'active' ? 'text-[#16A34A]' : 'text-[#999]'}`}>
+                                {item.data?.status === 'active' ? 'Sí' : 'No'}
+                              </span>
+                            </p>
+                            {item.data && (
+                              <button
+                                onClick={() => openReplaceSensorModal(sensor, item.data)}
+                                className="mt-2 w-full px-2 py-1 text-[11px] font-bold rounded border border-[#E5E5E5] hover:bg-[#F5F5F5] transition-colors"
+                              >
+                                Reemplazar {item.label.toLowerCase()}
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="text-[11px] font-bold text-[#666]">Asignar/Reasignar sucursal</label>
+                        <select
+                          value={sensor.branch_id ?? ''}
+                          onChange={(e) => reassignKitBranch(sensor, e.target.value)}
+                          className="mt-1 w-full md:w-72 px-2.5 py-2 border border-[#E5E5E5] rounded-lg text-xs bg-white"
+                        >
+                          <option value="">— Seleccionar sucursal —</option>
+                          {branches.map((b: any) => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => toggleSensorStatus(sensor)}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-[#E5E5E5] hover:bg-[#F5F5F5] transition-colors"
+                    >
+                      {active ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 border-t border-[#F3F3F3] pt-3">
+                    <p className="text-[11px] font-bold text-[#666] mb-1.5">Historial reciente</p>
+                    {kitHistory.length === 0 ? (
+                      <p className="text-[11px] text-[#999]">Sin historial registrado.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {kitHistory.map((h: any) => (
+                          <div key={h.id} className="text-[11px] text-[#666]">
+                            {h.position === 'entry' ? 'Entrada' : 'Salida'} · {h.serial_number || '—'} · {new Date(h.retired_at).toLocaleDateString('es-CL')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                  );
+                })()
+              ))}
+              {sensors.length === 0 && (
+                <div className="bg-white rounded-xl border border-[#E5E5E5] p-8 text-center text-[#666]">
+                  No hay sensores registrados
+                </div>
+              )}
+            </div>
+          </div>
+
         ) : resolvedTab === 'impacto' ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -1947,6 +2326,208 @@ export function AdminFluxFitPage({ initialTab }: AdminFluxFitProps) {
 
       </div>
       </main>
+
+      {/* Modal Registrar Sensor */}
+      {showRegisterModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg text-[#111]">Registrar Kit de Sensor</h3>
+              <button onClick={() => setShowRegisterModal(false)} className="text-[#666] hover:text-[#111]">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-bold text-[#111] mb-1">Gimnasio</label>
+                <select
+                  value={sensorForm.gym_id}
+                  onChange={e => setSensorForm({ ...sensorForm, gym_id: e.target.value, branch_id: '' })}
+                  className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                >
+                  <option value="">— Seleccionar gym —</option>
+                  {gyms.map((g: any) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-[#111] mb-1">Sucursal</label>
+                <select
+                  value={sensorForm.branch_id}
+                  onChange={e => setSensorForm({ ...sensorForm, branch_id: e.target.value })}
+                  disabled={!sensorForm.gym_id}
+                  className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm disabled:bg-[#F5F5F5]"
+                >
+                  <option value="">— Seleccionar sucursal —</option>
+                  {branches
+                    .filter((b: any) => !sensorForm.gym_id || b.gym_id === sensorForm.gym_id)
+                    .map((b: any) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-[#111] mb-1">Nombre del kit</label>
+                <input
+                  type="text"
+                  value={sensorForm.kit_name}
+                  onChange={e => setSensorForm({ ...sensorForm, kit_name: e.target.value })}
+                  placeholder="Ej: Acceso Principal"
+                  className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-bold text-[#111] mb-1">Código entrada</label>
+                  <input
+                    type="text"
+                    value={sensorForm.entry_code}
+                    onChange={e => setSensorForm({ ...sensorForm, entry_code: e.target.value })}
+                    placeholder="Ej: ENTRADA-001"
+                    className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-[#111] mb-1">Código salida</label>
+                  <input
+                    type="text"
+                    value={sensorForm.exit_code}
+                    onChange={e => setSensorForm({ ...sensorForm, exit_code: e.target.value })}
+                    placeholder="Ej: SALIDA-001"
+                    className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-bold text-[#111] mb-1">Marca</label>
+                  <input
+                    type="text"
+                    value={sensorForm.brand}
+                    onChange={e => setSensorForm({ ...sensorForm, brand: e.target.value })}
+                    placeholder="Ej: FluxFit"
+                    className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-[#111] mb-1">Modelo</label>
+                  <input
+                    type="text"
+                    value={sensorForm.model}
+                    onChange={e => setSensorForm({ ...sensorForm, model: e.target.value })}
+                    placeholder="Ej: IR-2026"
+                    className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-[#111] mb-1">Ubicación</label>
+                <input
+                  type="text"
+                  value={sensorForm.location}
+                  onChange={e => setSensorForm({ ...sensorForm, location: e.target.value })}
+                  placeholder="Ej: Entrada principal"
+                  className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={() => setShowRegisterModal(false)}
+                className="flex-1 px-4 py-2 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-lg hover:bg-[#F5F5F5] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={registerSensor}
+                disabled={!sensorForm.gym_id || !sensorForm.branch_id || !sensorForm.entry_code || !sensorForm.exit_code}
+                className="flex-1 px-4 py-2 bg-[#CC0000] text-white text-sm font-bold rounded-lg hover:bg-[#990000] transition-colors disabled:opacity-50"
+              >
+                Registrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Reemplazar Sensor */}
+      {replaceSensorModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg text-[#111]">
+                Reemplazar sensor {replaceSensorModal.position === 'entry' ? 'de entrada' : 'de salida'}
+              </h3>
+              <button onClick={() => setReplaceSensorModal(null)} className="text-[#666] hover:text-[#111]">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="text-xs text-[#666] bg-[#F5F5F5] rounded-lg p-2.5">
+                Código actual: <span className="font-mono text-[#111]">{replaceSensorModal.currentSerial || '—'}</span>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-[#111] mb-1">Nuevo código</label>
+                <input
+                  type="text"
+                  value={replaceSensorForm.serial_number}
+                  onChange={e => setReplaceSensorForm({ ...replaceSensorForm, serial_number: e.target.value })}
+                  placeholder="Ej: ENTRADA-002"
+                  className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-bold text-[#111] mb-1">Marca</label>
+                  <input
+                    type="text"
+                    value={replaceSensorForm.brand}
+                    onChange={e => setReplaceSensorForm({ ...replaceSensorForm, brand: e.target.value })}
+                    className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-[#111] mb-1">Modelo</label>
+                  <input
+                    type="text"
+                    value={replaceSensorForm.model}
+                    onChange={e => setReplaceSensorForm({ ...replaceSensorForm, model: e.target.value })}
+                    className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-[#111] mb-1">Motivo</label>
+                <select
+                  value={replaceSensorForm.reason}
+                  onChange={e => setReplaceSensorForm({ ...replaceSensorForm, reason: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm"
+                >
+                  <option value="replaced">Reemplazo por falla</option>
+                  <option value="maintenance">Mantenimiento</option>
+                  <option value="upgrade">Upgrade de hardware</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={() => setReplaceSensorModal(null)}
+                className="flex-1 px-4 py-2 border border-[#E5E5E5] text-[#666] text-sm font-bold rounded-lg hover:bg-[#F5F5F5] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={replaceSensorHardware}
+                disabled={!replaceSensorForm.serial_number.trim()}
+                className="flex-1 px-4 py-2 bg-[#CC0000] text-white text-sm font-bold rounded-lg hover:bg-[#990000] transition-colors disabled:opacity-50"
+              >
+                Guardar reemplazo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Approval Modal */}
       {approvingRequest && (

@@ -6,7 +6,8 @@ import type { Commerce, CommerceStore, CommerceProduct, CommerceCoupon, CouponRe
 import { CommerceStoresTab } from '../components/admin/CommerceStoresTab';
 import { CommerceProductsTab } from '../components/admin/CommerceProductsTab';
 import { CommerceCouponsTab } from '../components/admin/CommerceCouponsTab';
-import { Store, Package, Ticket, Settings, LayoutDashboard, QrCode, CheckCircle, XCircle, BarChart2, Clock } from 'lucide-react';
+import AdminSidebar from '../components/AdminSidebar';
+import { Settings, QrCode, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 type Tab = 'dashboard' | 'tiendas' | 'productos' | 'cupones' | 'estadisticas' | 'mi_plan';
 
@@ -16,7 +17,7 @@ const inp = 'w-full px-3 py-2 border border-[#E5E5E5] rounded-lg text-sm focus:o
 
 export function CommerceAdminPage({ initialTab }: Props) {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>(initialTab ?? 'dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'dashboard');
   const [commerce, setCommerce] = useState<Commerce | null>(null);
   const [stores, setStores] = useState<CommerceStore[]>([]);
   const [products, setProducts] = useState<CommerceProduct[]>([]);
@@ -62,7 +63,7 @@ export function CommerceAdminPage({ initialTab }: Props) {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   useEffect(() => {
-    if (initialTab) setTab(initialTab);
+    if (initialTab) setActiveTab(initialTab);
   }, [initialTab]);
 
   const save = async () => {
@@ -149,39 +150,40 @@ export function CommerceAdminPage({ initialTab }: Props) {
   const totalRedemptions = redemptions.length;
   const thisMonthRedemptions = redemptions.filter(r => new Date(r.redeemed_at) > new Date(Date.now() - 30 * 86400000)).length;
 
-  const tabs: { id: Tab; label: string; Icon: React.ElementType }[] = [
-    { id: 'dashboard', label: 'Panel', Icon: LayoutDashboard },
-    { id: 'cupones', label: 'Cupones', Icon: Ticket },
-    { id: 'estadisticas', label: 'Estadísticas', Icon: BarChart2 },
-    { id: 'tiendas', label: 'Tiendas', Icon: Store },
-    { id: 'productos', label: 'Productos', Icon: Package },
-    { id: 'mi_plan', label: 'Mi Plan', Icon: QrCode },
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'cupones', label: 'Mis Cupones', icon: '🏷️' },
+    { id: 'estadisticas', label: 'Estadísticas', icon: '📈' },
+    { id: 'tiendas', label: 'Mis Tiendas', icon: '🏪' },
+    { id: 'productos', label: 'Productos', icon: '📦' },
+    { id: 'mi_plan', label: 'Mi Plan', icon: '💳' }
   ];
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] pb-24">
-      <div className="bg-[#111111] px-4 pt-10 pb-4">
-        <p className="text-white/50 text-xs mb-0.5">FluxFit Admin</p>
-        <h1 className="text-white font-bold text-xl">{commerce.name}</h1>
-        <p className="text-white/60 text-xs mt-0.5">{getCommerceCategoryEmoji(commerce.category)} {getCommerceCategoryLabel(commerce.category)}</p>
-        {isPending && (
-          <div className="mt-2 flex items-center gap-2 bg-amber-500/20 rounded-lg px-3 py-1.5">
-            <Clock size={13} className="text-amber-300" />
-            <span className="text-amber-300 text-xs font-medium">Perfil pendiente de aprobación — no visible para usuarios</span>
+    <div className="flex h-screen bg-gray-50">
+      <AdminSidebar
+        navItems={navItems}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as Tab)}
+        logo="FLUXFIT"
+        title="Panel Comercio"
+      />
+
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-[900px] mx-auto w-full px-4 py-4">
+          <div className="bg-[#111111] px-4 pt-6 pb-4 mb-4">
+            <p className="text-white/50 text-xs mb-0.5">FluxFit Admin</p>
+            <h1 className="text-white font-bold text-xl">{commerce.name}</h1>
+            <p className="text-white/60 text-xs mt-0.5">{getCommerceCategoryEmoji(commerce.category)} {getCommerceCategoryLabel(commerce.category)}</p>
+            {isPending && (
+              <div className="mt-2 flex items-center gap-2 bg-amber-500/20 rounded-lg px-3 py-1.5">
+                <Clock size={13} className="text-amber-300" />
+                <span className="text-amber-300 text-xs font-medium">Perfil pendiente de aprobación — no visible para usuarios</span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <div className="flex border-b border-[#E5E5E5] bg-white sticky top-0 z-10 overflow-x-auto">
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 px-3 py-3 text-xs font-bold whitespace-nowrap border-b-2 transition-colors ${tab === t.id ? 'border-[#CC0000] text-[#CC0000]' : 'border-transparent text-[#999]'}`}>
-            <t.Icon size={13} />{t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="px-4 pt-4">
-        {tab === 'dashboard' && (
+        {activeTab === 'dashboard' && (
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -286,11 +288,11 @@ export function CommerceAdminPage({ initialTab }: Props) {
           </div>
         )}
 
-        {tab === 'cupones' && <CommerceCouponsTab commerceId={commerce.id} coupons={coupons} onRefresh={fetchAll} />}
-        {tab === 'tiendas' && <CommerceStoresTab commerceId={commerce.id} stores={stores} onRefresh={fetchAll} />}
-        {tab === 'productos' && <CommerceProductsTab commerceId={commerce.id} products={products} onRefresh={fetchAll} />}
+        {activeTab === 'cupones' && <CommerceCouponsTab commerceId={commerce.id} coupons={coupons} onRefresh={fetchAll} />}
+        {activeTab === 'tiendas' && <CommerceStoresTab commerceId={commerce.id} stores={stores} onRefresh={fetchAll} />}
+        {activeTab === 'productos' && <CommerceProductsTab commerceId={commerce.id} products={products} onRefresh={fetchAll} />}
 
-        {tab === 'estadisticas' && (
+        {activeTab === 'estadisticas' && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-xl border border-[#E5E5E5] p-4 text-center">
@@ -337,7 +339,7 @@ export function CommerceAdminPage({ initialTab }: Props) {
           </div>
         )}
 
-        {tab === 'mi_plan' && (
+        {activeTab === 'mi_plan' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-[#111]">Mi Plan</h2>
@@ -371,7 +373,8 @@ export function CommerceAdminPage({ initialTab }: Props) {
             <p className="text-xs text-[#666] text-center">¿Dudas? Escríbenos a cvlarenas@gmail.com</p>
           </div>
         )}
+        </div>
+      </main>
       </div>
-    </div>
   );
 }

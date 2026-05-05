@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Cpu, Plus, X, RefreshCw,
   ChevronDown, ChevronUp, AlertTriangle, Clock, History,
@@ -130,6 +131,7 @@ function SensorPill({ sensor }: { sensor: Sensor | undefined }) {
 type View = 'kits' | 'register' | 'replace' | 'history';
 
 export function SensorInventoryPage() {
+  const navigate = useNavigate();
   const { toast, showToast } = useToast();
   const [kits, setKits] = useState<SensorKit[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -768,6 +770,12 @@ export function SensorInventoryPage() {
             <RefreshCw size={15} className="text-white" />
           </button>
         </div>
+        <button
+          onClick={() => navigate('/admin/fluxfit')}
+          className="mb-3 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors"
+        >
+          Volver a Admin
+        </button>
 
         {/* Stats */}
         <div className="grid grid-cols-4 gap-2">

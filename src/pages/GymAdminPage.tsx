@@ -6,6 +6,7 @@ import { OccupancyGauge } from '../components/OccupancyGauge';
 import { OccupancyHeatmap } from '../components/OccupancyHeatmap';
 import { GymBranchesTab } from '../components/admin/GymBranchesTab';
 import { GymPromotionsTab } from '../components/admin/GymPromotionsTab';
+import AdminSidebar from '../components/AdminSidebar';
 import { formatCLP, getServiceCategoryLabel, getFullDayLabel, timeAgo } from '../lib/utils';
 import type { Gym, GymPlan, GymService, GymDiscount, GymRecommendedHour, WeeklyOccupancySummary, OccupancyLog, GymBranch, GymPromotion, CouponRedemption } from '../lib/types';
 import { Plus, Trash2, Copy, RefreshCw, AlertTriangle, QrCode, CheckCircle, XCircle, Clock } from 'lucide-react';
@@ -220,15 +221,20 @@ export function GymAdminPage({ initialTab }: Props) {
 
   if (!gym) return <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center text-[#666]">Cargando panel de administración...</div>;
 
-  const plan = subscription?.plan ?? 'free';
-  const canEditInfo = ['basico', 'pro', 'full', 'light'].includes(plan);
-  const canManagePlans = ['basico', 'pro', 'full', 'light'].includes(plan);
-  const canManageServices = ['basico', 'pro', 'full', 'light'].includes(plan);
-  const canManageDiscounts = ['basico', 'pro', 'full', 'light'].includes(plan);
-  const canManageHours = ['basico', 'pro', 'full', 'light'].includes(plan);
-  const canManageBranches = ['basico', 'pro', 'full', 'light'].includes(plan);
-  const canSeePromotions = ['pro', 'full'].includes(plan);
-  const canValidateQr = ['basico', 'pro', 'full', 'light'].includes(plan);
+  const rawPlan = (subscription?.plan ?? '').toLowerCase().trim();
+  const normalizedPlan =
+    rawPlan === 'basic' ? 'basico' :
+    rawPlan === 'premium_gym' ? 'pro' :
+    rawPlan || 'basico';
+  const hasManagementAccess = true;
+  const canEditInfo = hasManagementAccess;
+  const canManagePlans = hasManagementAccess;
+  const canManageServices = hasManagementAccess;
+  const canManageDiscounts = hasManagementAccess;
+  const canManageHours = hasManagementAccess;
+  const canManageBranches = hasManagementAccess;
+  const canSeePromotions = hasManagementAccess;
+  const canValidateQr = hasManagementAccess;
 
   const allTabs: { key: AdminTab; label: string; allowed: boolean }[] = [
     { key: 'sensor', label: 'Sensor', allowed: true },
@@ -242,22 +248,46 @@ export function GymAdminPage({ initialTab }: Props) {
     { key: 'validar_qr', label: 'Validar QR', allowed: canValidateQr },
   ];
   const tabs = allTabs.filter(t => t.allowed);
+  const navItems = tabs.map((t) => ({
+    id: t.key,
+    label: t.key === 'mi_plan' ? 'Mi Plan' : t.label,
+    icon:
+      t.key === 'sensor' ? '📡' :
+      t.key === 'sucursales' ? '🏢' :
+      t.key === 'planes' ? '⭐' :
+      t.key === 'servicios' ? '🛠️' :
+      t.key === 'promociones' ? '🎯' :
+      t.key === 'descuentos' ? '🏷️' :
+      t.key === 'horarios' ? '📅' :
+      t.key === 'validar_qr' ? '✅' :
+      '📊'
+  }));
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] pb-24">
+    <div className="flex h-screen bg-gray-50">
       <Toast {...toast} />
-      <div className="bg-[#111111] px-4 pt-8 pb-4">
-        <p className="text-white/60 text-xs">FluxFit Admin</p>
-        <h1 className="text-white font-bold text-lg">{gym.name}</h1>
-        {isPending && (
-          <div className="mt-2 flex items-center gap-2 bg-amber-500/20 rounded-lg px-3 py-1.5">
-            <Clock size={13} className="text-amber-300" />
-            <span className="text-amber-300 text-xs font-medium">Perfil pendiente de aprobación — no visible para usuarios</span>
-          </div>
-        )}
-      </div>
-      <div className="px-4 pt-4 space-y-4">
-        {!loadingPlan && plan === 'free' && (
+      <AdminSidebar
+        navItems={navItems}
+        activeTab={activeTab}
+        onTabChange={(tab) => { setActiveTab(tab as AdminTab); setShowAddForm(false); }}
+        logo="FLUXFIT"
+        title="Panel Gym"
+      />
+
+      <main className="flex-1 overflow-y-auto">
+      <div className="max-w-[900px] mx-auto w-full px-4 py-4 space-y-4">
+        <div className="bg-[#111111] px-4 pt-8 pb-4">
+          <p className="text-white/60 text-xs">FluxFit Admin</p>
+          <h1 className="text-white font-bold text-lg">{gym.name}</h1>
+          {isPending && (
+            <div className="mt-2 flex items-center gap-2 bg-amber-500/20 rounded-lg px-3 py-1.5">
+              <Clock size={13} className="text-amber-300" />
+              <span className="text-amber-300 text-xs font-medium">Perfil pendiente de aprobación — no visible para usuarios</span>
+            </div>
+          )}
+        </div>
+
+        {!loadingPlan && normalizedPlan === 'free' && (
           <div className="bg-[#FFFBEB] border border-[#FCD34D] rounded-xl p-4">
             <p className="text-[#92400E] font-bold text-sm">Plan gratuito — acceso limitado</p>
             <p className="text-[#92400E] text-xs mt-1">Contrata un plan para gestionar tu gym completo.</p>
@@ -333,11 +363,6 @@ export function GymAdminPage({ initialTab }: Props) {
               {gym.description && <p className="text-sm text-[#666] mt-1">{gym.description}</p>}
             </div>
           )}
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-          {tabs.map(t => <button key={t.key} onClick={() => { setActiveTab(t.key); setShowAddForm(false); }} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${activeTab === t.key ? 'bg-[#111111] text-white' : 'bg-white text-[#666666] border border-[#E5E5E5]'}`}>{t.label}</button>)}
         </div>
 
         <div className="space-y-3">
@@ -475,6 +500,7 @@ export function GymAdminPage({ initialTab }: Props) {
           )}
         </div>
       </div>
+      </main>
     </div>
   );
 }

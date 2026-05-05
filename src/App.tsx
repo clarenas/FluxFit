@@ -6,6 +6,8 @@ import { AuthPage } from './pages/AuthPage';
 import { HomePage } from './pages/HomePage';
 import { GymProfilePage } from './pages/GymProfilePage';
 import { PremiumPage } from './pages/PremiumPage';
+import { DiscountsPage } from './pages/DiscountsPage';
+import { ComparePage } from './pages/ComparePage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { GymAdminPage } from './pages/GymAdminPage';
@@ -59,8 +61,7 @@ function AppShell() {
   const location = useLocation();
 
   const showNav = [
-    '/home', '/favorites', '/premium', '/profile',
-    '/admin/gym', '/admin/commerce', '/admin/fluxfit',
+    '/home', '/favorites', '/premium', '/profile', '/discounts', '/compare',
   ].some(p => location.pathname.startsWith(p)); // /admin/fluxfit covers /admin/fluxfit/sensores too
 
   // While auth is resolving, render nothing to avoid flash
@@ -91,6 +92,8 @@ function AppShell() {
             <Route path="/gym/:id"   element={<AuthGuard><GymProfilePage /></AuthGuard>} />
             <Route path="/favorites" element={<AuthGuard><FavoritesPage /></AuthGuard>} />
             <Route path="/profile"   element={<AuthGuard><ProfilePage /></AuthGuard>} />
+            <Route path="/discounts" element={<AuthGuard><DiscountsPage /></AuthGuard>} />
+            <Route path="/compare"   element={<AuthGuard><ComparePage /></AuthGuard>} />
 
             {/* Premium page — accessible by all roles, shows role-specific content */}
             <Route path="/premium" element={<AuthGuard><PremiumPage /></AuthGuard>} />
