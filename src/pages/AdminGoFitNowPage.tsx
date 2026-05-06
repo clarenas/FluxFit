@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, X, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Building2, Store, ShoppingBag, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -21,6 +21,12 @@ const PLAN_DISPLAY: Record<string, { label: string; price: string; value: number
   light: { label: 'Light', price: '$89.900',  value: 89900 },
   pro:   { label: 'Pro',   price: '$149.900', value: 149900 },
 };
+
+/** PostgREST: relaciones 1:1 incrustadas vienen como objeto; 1:N como array */
+function firstEmbeddedRow<T>(embed: T | T[] | null | undefined): T | undefined {
+  if (embed == null) return undefined;
+  return Array.isArray(embed) ? embed[0] : embed;
+}
 
 interface AdminGoFitNowProps { initialTab?: string; }
 
@@ -68,6 +74,14 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
   const [gestionSubTab, setGestionSubTab] = useState('gyms');
   const [showGestionSubmenu, setShowGestionSubmenu] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState<Record<string, any>>({});
+  const [configDraft, setConfigDraft] = useState({
+    lightPrice: 89900,
+    lightBranches: 3,
+    proPrice: 149900,
+    proBranches: 8,
+  });
+  const [configSaving, setConfigSaving] = useState(false);
   const [sensorForm, setSensorForm] = useState({
     gym_id: '',
     branch_id: '',
@@ -96,9 +110,28 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
 
   const { toast, showToast } = useToast();
 
+  const planRuntimeConfig = useMemo(() => {
+    const gp = platformSettings.gym_plans ?? {};
+    return {
+      free: {
+        plan_price: 0,
+        max_branches: typeof gp.free?.max_branches === 'number' ? gp.free.max_branches : 1,
+      },
+      light: {
+        plan_price: typeof gp.light?.price_clp === 'number' ? gp.light.price_clp : 89900,
+        max_branches: typeof gp.light?.max_branches === 'number' ? gp.light.max_branches : 3,
+      },
+      pro: {
+        plan_price: typeof gp.pro?.price_clp === 'number' ? gp.pro.price_clp : 149900,
+        max_branches: typeof gp.pro?.max_branches === 'number' ? gp.pro.max_branches : 8,
+      },
+    };
+  }, [platformSettings]);
+
   const fetchAll = async () => {
     setLoading(true);
-    const [gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes, couponUsageRes, sensorsRes, branchesRes, sensorHistoryRes] = await Promise.all([
+    const [settingsRes, gymsRes, usersRes, messagesRes, requestsRes, commercesRes, redemptionsRes, couponUsageRes, sensorsRes, branchesRes, sensorHistoryRes] = await Promise.all([
+      supabase.from('app_settings').select('settings').eq('id', 'global').maybeSingle(),
       supabase.from('gyms').select('*, gym_subscriptions(plan,plan_price,status,valid_until), gym_branches(id), gym_admins(id)').order('name'),
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('contact_messages').select('*').order('created_at', { ascending: false }),
@@ -114,8 +147,11 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
       supabase.from('sensor_history').select('*').order('retired_at', { ascending: false }).limit(200),
     ]);
 
+    const loadedSettings = (settingsRes.data?.settings as Record<string, any> | undefined) ?? {};
+    setPlatformSettings(loadedSettings);
+
     const mappedGyms = (gymsRes.data ?? []).map((g: any) => {
-      const sub = g.gym_subscriptions?.[0];
+      const sub = firstEmbeddedRow(g.gym_subscriptions);
       return {
         ...g,
         plan: sub?.plan ?? 'free',
@@ -147,6 +183,17 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'config') return;
+    const gp = platformSettings.gym_plans ?? {};
+    setConfigDraft({
+      lightPrice: typeof gp.light?.price_clp === 'number' ? gp.light.price_clp : 89900,
+      lightBranches: typeof gp.light?.max_branches === 'number' ? gp.light.max_branches : 3,
+      proPrice: typeof gp.pro?.price_clp === 'number' ? gp.pro.price_clp : 149900,
+      proBranches: typeof gp.pro?.max_branches === 'number' ? gp.pro.max_branches : 8,
+    });
+  }, [activeTab, platformSettings]);
 
   useEffect(() => {
     if (user && user.role !== 'gofitnow_admin') {
@@ -304,7 +351,11 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
   const toggleGymActive = async (gym: any) => {
     const action = gym.is_active ? 'dar de baja' : 'dar de alta';
     if (!window.confirm(`¿Confirmas ${action} a "${gym.name}"?`)) return;
-    await supabase.from('gyms').update({ is_active: !gym.is_active }).eq('id', gym.id);
+    const { error } = await supabase.from('gyms').update({ is_active: !gym.is_active }).eq('id', gym.id);
+    if (error) {
+      showToast(error.message, 'error');
+      return;
+    }
     showToast(`Gym ${gym.is_active ? 'dado de baja' : 'dado de alta'} correctamente`, 'success');
     fetchAll();
   };
@@ -365,16 +416,17 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
       return;
     }
 
-    const { data: newKit, error } = await supabase.from('sensor_kits').insert({
-      branch_id: sensorForm.branch_id,
-      name: sensorForm.kit_name.trim() || 'Acceso Principal',
-      status: 'operativo',
-      activation_date: new Date().toISOString().split('T')[0],
-      observations: sensorForm.location || null,
-    } as any).select('id').single();
+    const { data: newKit, error } = await supabase
+      .from('sensor_kits')
+      .insert({
+        branch_id: sensorForm.branch_id,
+        name: sensorForm.kit_name.trim() || 'Acceso Principal',
+      })
+      .select('id')
+      .single();
 
-    if (error) {
-      showToast('Error al registrar sensor', 'error');
+    if (error || !newKit) {
+      showToast(`Error al registrar kit: ${error?.message ?? 'sin respuesta'}`, 'error');
       return;
     }
 
@@ -405,7 +457,7 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
     ]);
 
     if (sensorsErr) {
-      showToast('Kit creado, pero falló el alta de sensores', 'error');
+      showToast(`Kit creado, pero falló el alta de sensores: ${sensorsErr.message}`, 'error');
       await supabase.from('sensor_kits').delete().eq('id', newKit.id);
       return;
     }
@@ -516,49 +568,63 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
 
   const deleteGym = async (gym: any) => {
     if (!window.confirm(`¿Eliminar permanentemente "${gym.name}"? Esta acción no se puede deshacer.`)) return;
-    await supabase.from('gyms').update({ is_active: false }).eq('id', gym.id);
-    showToast('Gym eliminado del registro', 'success');
+    const { error } = await supabase.from('gyms').delete().eq('id', gym.id);
+    if (error) {
+      showToast(`No se pudo eliminar el gym: ${error.message}`, 'error');
+      return;
+    }
+    showToast('Gym eliminado', 'success');
     fetchAll();
   };
 
-  const PLAN_CONFIG: Record<string, { plan_price: number; max_branches: number }> = {
-    free:  { plan_price: 0,      max_branches: 1 },
-    light: { plan_price: 89900,  max_branches: 3 },
-    pro:   { plan_price: 149900, max_branches: 8 },
-  };
-
-  const updatePartnerPlan = async (gym: any, newPlan: string) => {
-    const config = PLAN_CONFIG[newPlan];
+  const updatePartnerPlan = async (gym: any, newPlan: 'free' | 'light' | 'pro') => {
+    const config = planRuntimeConfig[newPlan];
     if (!config) return;
     setUpdatingPlan(gym.id);
     try {
       const valid_until = new Date(Date.now() + 30 * 86400000).toISOString();
-      // Upsert gym_subscriptions (unique on gym_id)
-      const { data: existing } = await supabase
+      const { data: existing, error: exErr } = await supabase
         .from('gym_subscriptions')
         .select('id')
         .eq('gym_id', gym.id)
         .maybeSingle();
+      if (exErr) {
+        showToast(`No se pudo leer suscripción: ${exErr.message}`, 'error');
+        return;
+      }
 
       if (existing) {
-        await supabase.from('gym_subscriptions').update({
+        const { error: upErr } = await supabase.from('gym_subscriptions').update({
           plan: newPlan,
           plan_price: config.plan_price,
           status: newPlan === 'free' ? 'inactive' : 'active',
           valid_until: newPlan === 'free' ? null : valid_until,
         }).eq('gym_id', gym.id);
+        if (upErr) {
+          showToast(`No se pudo actualizar el plan: ${upErr.message}`, 'error');
+          return;
+        }
       } else {
-        await supabase.from('gym_subscriptions').insert({
+        const { error: insErr } = await supabase.from('gym_subscriptions').insert({
           gym_id: gym.id,
           plan: newPlan,
           plan_price: config.plan_price,
           status: newPlan === 'free' ? 'inactive' : 'active',
           valid_until: newPlan === 'free' ? null : valid_until,
         });
+        if (insErr) {
+          showToast(`No se pudo crear suscripción: ${insErr.message}`, 'error');
+          return;
+        }
       }
 
-      // Update gyms.max_branches
-      await supabase.from('gyms').update({ max_branches: config.max_branches }).eq('id', gym.id);
+      const { error: gymErr } = await supabase.from('gyms').update({ max_branches: config.max_branches }).eq('id', gym.id);
+      if (gymErr) {
+        showToast(`Plan actualizado, pero no max_branches: ${gymErr.message}`, 'error');
+        fetchAll();
+        return;
+      }
+      showToast('Plan actualizado correctamente', 'success');
       fetchAll();
     } finally {
       setUpdatingPlan(null);
@@ -574,17 +640,20 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
 
   const openEditGym = (gym: any) => {
     setEditingGym(gym);
+    const firstBranch = branches.find((b: any) => b.gym_id === gym.id);
+    const rawPlan = gym.plan ?? 'free';
+    const pNorm = (rawPlan === 'light' || rawPlan === 'pro' || rawPlan === 'free' ? rawPlan : 'free') as 'free' | 'light' | 'pro';
     setGymForm({
       name: gym.name ?? '',
-      branch_name: gym.branch_name ?? '',
+      branch_name: firstBranch?.name ?? '',
       address: gym.address ?? '',
       comuna: gym.comuna ?? '',
       phone: gym.phone ?? '',
       website: gym.website ?? '',
       description: gym.description ?? '',
       manager_email: '',
-      plan: gym.plan ?? 'free',
-      plan_price: PLAN_DISPLAY[gym.plan ?? 'free']?.value ?? 0,
+      plan: rawPlan,
+      plan_price: planRuntimeConfig[pNorm]?.plan_price ?? PLAN_DISPLAY[rawPlan]?.value ?? 0,
       valid_days: '30',
     });
     setShowGymModal(true);
@@ -602,7 +671,6 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
     try {
       const gymPayload = {
         name: gymForm.name,
-        branch_name: gymForm.branch_name || null,
         address: gymForm.address,
         comuna: gymForm.comuna,
         phone: gymForm.phone,
@@ -611,19 +679,48 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
       };
 
       if (editingGym) {
-        await supabase.from('gyms').update(gymPayload).eq('id', editingGym.id);
+        const { error: gymUpErr } = await supabase.from('gyms').update(gymPayload).eq('id', editingGym.id);
+        if (gymUpErr) throw gymUpErr;
+        const subPrice =
+          gymForm.plan === 'light'
+            ? planRuntimeConfig.light.plan_price
+            : gymForm.plan === 'pro'
+              ? planRuntimeConfig.pro.plan_price
+              : 0;
         const valid_until = gymForm.plan === 'free'
           ? null
           : new Date(Date.now() + Number(gymForm.valid_days) * 86400000).toISOString();
         const { error: subErr } = await supabase
           .from('gym_subscriptions')
           .upsert(
-            { gym_id: editingGym.id, plan: gymForm.plan, plan_price: PLAN_DISPLAY[gymForm.plan]?.value ?? 0, status: 'active', valid_until },
+            {
+              gym_id: editingGym.id,
+              plan: gymForm.plan,
+              plan_price: subPrice,
+              status: gymForm.plan === 'free' ? 'inactive' : 'active',
+              valid_until,
+            },
             { onConflict: 'gym_id' }
           );
         if (subErr) {
-          alert('Error al actualizar plan: ' + subErr.message);
+          showToast('Error al actualizar plan: ' + subErr.message, 'error');
           return;
+        }
+        const maxB =
+          gymForm.plan === 'light'
+            ? planRuntimeConfig.light.max_branches
+            : gymForm.plan === 'pro'
+              ? planRuntimeConfig.pro.max_branches
+              : planRuntimeConfig.free.max_branches;
+        const { error: mbErr } = await supabase.from('gyms').update({ max_branches: maxB }).eq('id', editingGym.id);
+        if (mbErr) showToast('Gym guardado; max_branches: ' + mbErr.message, 'error');
+        if (gymForm.branch_name?.trim()) {
+          const nm = gymForm.branch_name.trim();
+          const { data: dup } = await supabase.from('gym_branches').select('id').eq('gym_id', editingGym.id).eq('name', nm).maybeSingle();
+          if (!dup) {
+            const { error: brErr } = await supabase.from('gym_branches').insert({ gym_id: editingGym.id, name: nm });
+            if (brErr) showToast('Sucursal: ' + brErr.message, 'error');
+          }
         }
       } else {
         const { data: createdGym, error: gymErr } = await supabase
@@ -634,13 +731,28 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
         if (gymErr) throw gymErr;
         const gymId = createdGym.id;
         const valid_until = new Date(Date.now() + 30 * 86400000).toISOString();
-        await supabase.from('gym_subscriptions').insert({
+        const createPrice =
+          gymForm.plan === 'light'
+            ? planRuntimeConfig.light.plan_price
+            : gymForm.plan === 'pro'
+              ? planRuntimeConfig.pro.plan_price
+              : 0;
+        const createMax =
+          gymForm.plan === 'light'
+            ? planRuntimeConfig.light.max_branches
+            : gymForm.plan === 'pro'
+              ? planRuntimeConfig.pro.max_branches
+              : planRuntimeConfig.free.max_branches;
+        const { error: maxErr } = await supabase.from('gyms').update({ max_branches: createMax }).eq('id', gymId);
+        if (maxErr) throw maxErr;
+        const { error: subInsErr } = await supabase.from('gym_subscriptions').insert({
           gym_id: gymId,
           plan: gymForm.plan,
-          plan_price: PLAN_DISPLAY[gymForm.plan]?.value ?? 0,
+          plan_price: createPrice,
           status: gymForm.plan === 'free' ? 'inactive' : 'active',
           valid_until: gymForm.plan === 'free' ? null : valid_until,
         });
+        if (subInsErr) throw subInsErr;
 
         if (gymForm.branch_name?.trim()) {
           await supabase.from('gym_branches').insert({ gym_id: gymId, name: gymForm.branch_name.trim() });
@@ -678,6 +790,54 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
     }
     showToast('Sucursal creada', 'success');
     fetchAll();
+  };
+
+  const renameBranchFlux = async (branch: any) => {
+    const name = typeof window !== 'undefined' ? window.prompt('Nuevo nombre de sucursal', branch.name ?? '') : null;
+    if (!name?.trim() || !branch?.id) return;
+    const { error } = await supabase.from('gym_branches').update({ name: name.trim() }).eq('id', branch.id);
+    if (error) {
+      showToast(error.message, 'error');
+      return;
+    }
+    showToast('Sucursal actualizada', 'success');
+    fetchAll();
+  };
+
+  const deleteBranchFlux = async (branch: any) => {
+    if (!window.confirm(`¿Eliminar la sucursal "${branch.name}"? Los kits de sensor enlazados se eliminarán en cascada si aplica.`)) return;
+    const { error } = await supabase.from('gym_branches').delete().eq('id', branch.id);
+    if (error) {
+      showToast(error.message, 'error');
+      return;
+    }
+    showToast('Sucursal eliminada', 'success');
+    fetchAll();
+  };
+
+  const saveAppSettings = async () => {
+    setConfigSaving(true);
+    try {
+      const nextSettings = {
+        ...platformSettings,
+        gym_plans: {
+          ...(platformSettings.gym_plans ?? {}),
+          light: { price_clp: configDraft.lightPrice, max_branches: configDraft.lightBranches },
+          pro: { price_clp: configDraft.proPrice, max_branches: configDraft.proBranches },
+        },
+      };
+      const { error } = await supabase.from('app_settings').upsert(
+        { id: 'global', settings: nextSettings, updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      );
+      if (error) throw error;
+      setPlatformSettings(nextSettings);
+      showToast('Configuración guardada', 'success');
+    } catch (e: any) {
+      showToast(e?.message ?? 'Error al guardar configuración', 'error');
+    } finally {
+      setConfigSaving(false);
+    }
   };
 
 
@@ -1036,7 +1196,11 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
                           ? { label: 'VENCIDO', dot: 'bg-[#CC0000]', badge: 'bg-[#CC0000]/10 text-[#CC0000]' }
                           : { label: 'ACTIVO', dot: 'bg-[#16A34A]', badge: 'bg-[#16A34A]/10 text-[#16A34A]' };
 
-                    const planPrices: Record<string, string> = { free: '$0', light: '$89.900', pro: '$149.900' };
+                    const planPrices: Record<string, string> = {
+                      free: formatCLP(0),
+                      light: formatCLP(planRuntimeConfig.light.plan_price),
+                      pro: formatCLP(planRuntimeConfig.pro.plan_price),
+                    };
 
                     return (
                       <div
@@ -1121,13 +1285,49 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
                           </div>
                         </div>
 
+                        {/* Sucursales */}
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold text-[#999] uppercase tracking-wider">Sucursales</p>
+                          {branches.filter((b: any) => b.gym_id === gym.id).length === 0 ? (
+                            <p className="text-xs text-[#999]">Sin sucursales registradas</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {branches.filter((b: any) => b.gym_id === gym.id).map((b: any) => (
+                                <div key={b.id} className="flex items-center justify-between gap-2 bg-[#F9F9F9] rounded-lg px-3 py-2">
+                                  <span className="text-xs font-medium text-[#111] truncate">{b.name}</span>
+                                  <div className="flex gap-1 flex-shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => renameBranchFlux(b)}
+                                      className="text-[10px] font-bold text-[#0EA5E9] px-2 py-0.5 rounded border border-[#0EA5E9]/30"
+                                    >
+                                      Renombrar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteBranchFlux(b)}
+                                      className="text-[10px] font-bold text-[#CC0000] px-2 py-0.5 rounded border border-[#CC0000]/25"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                         {/* Plan selector */}
                         <div className="bg-[#F5F5F5] rounded-xl p-3 space-y-2">
                           <p className="text-[10px] font-bold text-[#666] uppercase tracking-wider">Cambiar plan</p>
                           <div className="grid grid-cols-3 gap-1.5">
                             {(['free', 'light', 'pro'] as const).map(p => {
                               const labels: Record<string, string> = { free: 'Free', light: 'Light', pro: 'Pro' };
-                              const prices: Record<string, string> = { free: '$0', light: '$89.900', pro: '$149.900' };
+                              const prices: Record<string, string> = {
+                                free: formatCLP(0),
+                                light: formatCLP(planRuntimeConfig.light.plan_price),
+                                pro: formatCLP(planRuntimeConfig.pro.plan_price),
+                              };
                               const isCurrent = gym.plan === p;
                               return (
                                 <button
@@ -2168,7 +2368,7 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
             {(() => {
               const now = Date.now();
               const mapped = commerces.map((c: any) => {
-                const sub = c.commerce_subscriptions?.[0];
+                const sub = firstEmbeddedRow(c.commerce_subscriptions);
                 const valid_until = sub?.valid_until ?? null;
                 const daysLeft = valid_until ? Math.ceil((new Date(valid_until).getTime() - now) / 86400000) : null;
                 return {
@@ -2487,6 +2687,68 @@ export function AdminGoFitNowPage({ initialTab }: AdminGoFitNowProps) {
                 </>
               );
             })()}
+          </div>
+
+        ) : resolvedTab === 'config' ? (
+          <div className="space-y-4 max-w-lg">
+            <div className="bg-white rounded-2xl border border-[#E5E5E5] p-5 space-y-4">
+              <div>
+                <h2 className="font-bold text-[#111] text-base">Planes gym (precios y límites)</h2>
+                <p className="text-xs text-[#666] mt-1">
+                  Valores en CLP y máximo de sucursales por plan. Se usan al cambiar plan desde Gestión → Gyms.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-[#999] uppercase mb-1">Light — precio / mes</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={configDraft.lightPrice}
+                    onChange={e => setConfigDraft(d => ({ ...d, lightPrice: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-lg border border-[#E5E5E5] text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[#999] uppercase mb-1">Light — máx. sucursales</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={configDraft.lightBranches}
+                    onChange={e => setConfigDraft(d => ({ ...d, lightBranches: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-lg border border-[#E5E5E5] text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[#999] uppercase mb-1">Pro — precio / mes</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={configDraft.proPrice}
+                    onChange={e => setConfigDraft(d => ({ ...d, proPrice: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-lg border border-[#E5E5E5] text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[#999] uppercase mb-1">Pro — máx. sucursales</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={configDraft.proBranches}
+                    onChange={e => setConfigDraft(d => ({ ...d, proBranches: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-lg border border-[#E5E5E5] text-sm"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={configSaving}
+                onClick={saveAppSettings}
+                className="w-full py-2.5 bg-[#CC0000] text-white text-sm font-bold rounded-xl disabled:opacity-50"
+              >
+                {configSaving ? 'Guardando…' : 'Guardar configuración'}
+              </button>
+            </div>
           </div>
 
         ) : null}
